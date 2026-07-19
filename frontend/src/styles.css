@@ -1,0 +1,103 @@
+:root {
+  --bg: #0f1117;
+  --panel: #181b23;
+  --panel-2: #1f2330;
+  --border: #2a2f3d;
+  --text: #e6e8ee;
+  --muted: #9aa1b2;
+  --accent: #4f7cff;
+  --green: #2ecc71;
+  --red: #e74c3c;
+  --amber: #f1c40f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app { max-width: 960px; margin: 0 auto; padding: 0 20px 60px; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+}
+.topbar h1 { font-size: 20px; margin: 0; letter-spacing: 0.5px; }
+.topbar nav { display: flex; gap: 8px; }
+.topbar nav button {
+  background: transparent; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 14px;
+}
+.topbar nav button.active { color: var(--text); background: var(--panel-2); border-color: var(--accent); }
+
+button { font-family: inherit; }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; margin-bottom: 16px;
+}
+
+.form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.form-row label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.form-row input, .form-row select {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; font-size: 14px; min-width: 120px;
+}
+
+.btn {
+  background: var(--accent); color: white; border: none; border-radius: 8px;
+  padding: 11px 22px; font-size: 14px; cursor: pointer; font-weight: 600;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn.accept { background: var(--green); }
+.btn.reject { background: var(--red); }
+.btn.big { padding: 14px 36px; font-size: 16px; }
+
+.error { color: var(--red); }
+.muted { color: var(--muted); }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--panel-2); }
+
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+.badge.qualified, .badge.ready, .badge.accepted { background: rgba(46, 204, 113, 0.15); color: var(--green); }
+.badge.nei, .badge.pulling, .badge.qualifying { background: rgba(241, 196, 15, 0.15); color: var(--amber); }
+.badge.disqualified, .badge.failed, .badge.rejected { background: rgba(231, 76, 60, 0.15); color: var(--red); }
+.badge.reviewed, .badge.pending { background: rgba(79, 124, 255, 0.15); color: var(--accent); }
+
+.progress-log {
+  background: var(--panel-2); border-radius: 8px; padding: 12px;
+  font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted);
+  max-height: 220px; overflow-y: auto; white-space: pre-wrap;
+}
+
+.stat-row { display: flex; gap: 24px; margin: 12px 0; flex-wrap: wrap; }
+.stat { display: flex; flex-direction: column; }
+.stat .num { font-size: 24px; font-weight: 700; }
+.stat .label { font-size: 12px; color: var(--muted); }
+
+.progress-bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin: 12px 0; }
+.progress-bar > div { height: 100%; background: var(--accent); transition: width 0.3s; }
+
+.lead-card h2 { margin: 0 0 4px; font-size: 22px; }
+.lead-card a { color: var(--accent); text-decoration: none; }
+.reasoning {
+  background: var(--panel-2); border-left: 3px solid var(--accent);
+  padding: 12px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; line-height: 1.5;
+}
+.signals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 14px 0; }
+.signal { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
+.signal .k { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.signal .v { font-size: 13px; line-height: 1.4; }
+.decision-row { display: flex; gap: 14px; margin-top: 20px; align-items: center; }
