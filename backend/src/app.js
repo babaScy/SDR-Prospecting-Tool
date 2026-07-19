@@ -8,7 +8,7 @@ app.use(express.json());
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Routes are mounted as they are built (Tasks 5-6):
-// app.use('/api/pull', require('./routes/pull'));
+app.use('/api/pull', require('./routes/pull'));
 // app.use('/api/lists', require('./routes/lists'));
 // app.use('/api/leads', require('./routes/leads'));
 
