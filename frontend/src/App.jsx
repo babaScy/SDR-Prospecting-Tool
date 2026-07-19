@@ -3,6 +3,7 @@ import PullScreen from './components/PullScreen';
 import ListsScreen from './components/ListsScreen';
 import ListDetailScreen from './components/ListDetailScreen';
 import UserPicker from './components/UserPicker';
+import { IconUndo } from './icons';
 import { USER_STORAGE_KEY } from './api';
 import USERS from './users';
 
@@ -42,7 +43,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Prospector</h1>
+        <div className="wordmark">
+          <div className="wordmark-mark" />
+          <span className="wordmark-text">Prospector</span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <nav>
             {user.role === 'admin' && (
@@ -57,9 +61,15 @@ export default function App() {
               Lists
             </button>
           </nav>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="muted">{user.email} · {user.role}</span>
-            <button className="btn ghost" onClick={switchUser}>Switch</button>
+          <div className="user-chip">
+            <div className={`avatar role-${user.role}`}>{user.email[0]}</div>
+            <div className="user-chip-text">
+              <span className="user-chip-email">{user.email}</span>
+              <span className="user-chip-role">{user.role}</span>
+            </div>
+            <button className="btn ghost small" onClick={switchUser}>
+              <IconUndo /> Switch
+            </button>
           </div>
         </div>
       </header>

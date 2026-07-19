@@ -92,6 +92,17 @@ export default function PullScreen() {
           </h3>
           <p className="muted">{activeList.lastMessage}</p>
           {activeList.status === 'failed' && <p className="error">{activeList.error}</p>}
+          {isRunning && (
+            <div className={`progress-bar${activeList.status === 'qualifying' ? ' indeterminate' : ''}`}>
+              <div
+                style={{
+                  width: activeList.status === 'qualifying'
+                    ? undefined
+                    : `${activeList.requestedCount ? Math.min(100, (activeList.pulledCount / activeList.requestedCount) * 100) : 0}%`,
+                }}
+              />
+            </div>
+          )}
           <div className="stat-row">
             <div className="stat"><span className="num">{activeList.pulledCount}</span><span className="label">pulled / {activeList.requestedCount} requested</span></div>
             {counts && (

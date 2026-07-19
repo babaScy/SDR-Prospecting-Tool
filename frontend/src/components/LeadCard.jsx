@@ -17,11 +17,13 @@ export default function LeadCard({ lead }) {
   return (
     <div className="lead-card">
       <h2>{lead.companyName}</h2>
-      {lead.website && (
-        <a href={lead.website} target="_blank" rel="noreferrer">{domain}</a>
-      )}{' '}
-      <span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span>
-      {lead.tier && <span className="badge pending">Tier {lead.tier}</span>}
+      <div className="lead-card-header">
+        {lead.website && (
+          <a href={lead.website} target="_blank" rel="noreferrer">{domain}</a>
+        )}
+        <span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span>
+        {lead.tier && <span className="badge pending">Tier {lead.tier}</span>}
+      </div>
 
       {q.reasoning && <div className="reasoning">{q.reasoning}</div>}
       {lead.disqualifyReason && !q.reasoning && <div className="reasoning">{lead.disqualifyReason}</div>}

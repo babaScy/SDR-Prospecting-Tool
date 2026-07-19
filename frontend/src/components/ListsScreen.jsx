@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchLists } from '../api';
+import { IconTable } from '../icons';
 
 export default function ListsScreen({ onOpen, isAdmin }) {
   const [lists, setLists] = useState(null);
@@ -20,7 +21,14 @@ export default function ListsScreen({ onOpen, isAdmin }) {
 
   if (error) return <p className="error">{error}</p>;
   if (!lists) return <p className="muted">Loading…</p>;
-  if (!lists.length) return <p className="muted">No lists yet — run a pull first.</p>;
+  if (!lists.length) {
+    return (
+      <div className="panel empty-state">
+        <div className="icon-circle"><IconTable /></div>
+        <p className="muted">No lists yet — run a pull first.</p>
+      </div>
+    );
+  }
 
   const totals = lists.reduce(
     (acc, l) => ({
@@ -38,12 +46,12 @@ export default function ListsScreen({ onOpen, isAdmin }) {
     <div>
       <div className="panel">
         <div className="stat-row">
-          <div className="stat"><span className="num">{totals.pulled}</span><span className="label">pulled</span></div>
-          <div className="stat"><span className="num">{totals.qualified}</span><span className="label">qualified</span></div>
-          <div className="stat"><span className="num">{totals.accepted}</span><span className="label">accepted</span></div>
-          <div className="stat"><span className="num">{totals.tierA}</span><span className="label">tier A</span></div>
-          <div className="stat"><span className="num">{totals.tierB}</span><span className="label">tier B</span></div>
-          <div className="stat"><span className="num">{totals.tierC}</span><span className="label">tier C</span></div>
+          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.pulled}</div><div className="label">pulled</div></div></div>
+          <div className="stat-card tone-green"><div className="dot" /><div><div className="num">{totals.qualified}</div><div className="label">qualified</div></div></div>
+          <div className="stat-card tone-primary"><div className="dot" /><div><div className="num">{totals.accepted}</div><div className="label">accepted</div></div></div>
+          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.tierA}</div><div className="label">tier A</div></div></div>
+          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.tierB}</div><div className="label">tier B</div></div></div>
+          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.tierC}</div><div className="label">tier C</div></div></div>
         </div>
       </div>
       <div className="panel">

@@ -10,20 +10,18 @@ export default function UserPicker({ onPick }) {
         <h2>Who are you?</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '16px 0' }}>
           {USERS.map((u) => (
-            <label key={u.email} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="user"
-                value={u.email}
-                checked={selected === u.email}
-                onChange={() => setSelected(u.email)}
-              />
-              {u.email}
+            <div
+              key={u.email}
+              className={`picker-row${selected === u.email ? ' selected' : ''}`}
+              onClick={() => setSelected(u.email)}
+            >
+              <div className={`avatar role-${u.role}`}>{u.email[0]}</div>
+              <span className="picker-row-email">{u.email}</span>
               {u.role === 'admin' && <span className="badge pending">admin</span>}
-            </label>
+            </div>
           ))}
         </div>
-        <button className="btn" onClick={() => onPick(selected)}>Continue</button>
+        <button className="btn" style={{ width: '100%' }} onClick={() => onPick(selected)}>Continue</button>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchLeads, sendDecision } from '../api';
+import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../icons';
 
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified', pending: 'Pending' };
 const SDR_LABELS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
@@ -100,8 +101,11 @@ export default function ListTable({ listId }) {
           <thead>
             <tr>
               {COLUMNS.map((col) => (
-                <th key={col.key} onClick={() => toggleSort(col.key)} style={{ cursor: 'pointer' }}>
-                  {col.label}{sort.key === col.key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
+                  {col.label}
+                  {sort.key === col.key && (
+                    <span className="sort-icon">{sort.dir === 1 ? <IconChevronUp /> : <IconChevronDown />}</span>
+                  )}
                 </th>
               ))}
               <th>Actions</th>
@@ -119,11 +123,17 @@ export default function ListTable({ listId }) {
                 <td>
                   {lead.sdrStatus === 'pending' ? (
                     <div className="decision-row" style={{ margin: 0 }}>
-                      <button className="btn accept" onClick={() => decide(lead, 'accepted')} disabled={busyId === lead._id}>Accept</button>
-                      <button className="btn reject" onClick={() => decide(lead, 'rejected')} disabled={busyId === lead._id}>Reject</button>
+                      <button className="btn accept small" onClick={() => decide(lead, 'accepted')} disabled={busyId === lead._id}>
+                        <IconCheck /> Accept
+                      </button>
+                      <button className="btn reject small" onClick={() => decide(lead, 'rejected')} disabled={busyId === lead._id}>
+                        <IconX /> Reject
+                      </button>
                     </div>
                   ) : (
-                    <button className="btn ghost" onClick={() => decide(lead, 'pending')} disabled={busyId === lead._id}>Undo</button>
+                    <button className="btn ghost small" onClick={() => decide(lead, 'pending')} disabled={busyId === lead._id}>
+                      <IconUndo /> Undo
+                    </button>
                   )}
                 </td>
               </tr>

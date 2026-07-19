@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchLeads, sendDecision } from '../api';
+import { IconCheck, IconX, IconUndo, IconArrowLeft } from '../icons';
 import LeadCard from './LeadCard';
 
 const BUCKETS = ['qualified', 'nei', 'disqualified'];
@@ -25,7 +26,7 @@ export default function ReviewScreen({ listId, onBack }) {
     return (
       <div className="panel">
         <p className="error">{error}</p>
-        <button className="btn ghost" onClick={onBack}>← Lists</button>
+        <button className="btn ghost" onClick={onBack}><IconArrowLeft /> Lists</button>
       </div>
     );
   }
@@ -71,11 +72,11 @@ export default function ReviewScreen({ listId, onBack }) {
         <h2>Review complete 🎉</h2>
         {error && <p className="error">{error}</p>}
         <div className="stat-row">
-          <div className="stat"><span className="num">{accepted}</span><span className="label">accepted</span></div>
-          <div className="stat"><span className="num">{rejected}</span><span className="label">rejected</span></div>
+          <div className="stat-card tone-green"><div className="dot" /><div><div className="num">{accepted}</div><div className="label">accepted</div></div></div>
+          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{rejected}</div><div className="label">rejected</div></div></div>
         </div>
         <div className="decision-row">
-          <button className="btn ghost" onClick={undo} disabled={busy || !done.length}>Undo last</button>
+          <button className="btn ghost" onClick={undo} disabled={busy || !done.length}><IconUndo /> Undo last</button>
           <button className="btn" onClick={onBack}>Back to lists</button>
         </div>
       </div>
@@ -89,7 +90,7 @@ export default function ReviewScreen({ listId, onBack }) {
     <div>
       <div className="panel">
         <div className="decision-row" style={{ marginTop: 0, justifyContent: 'space-between' }}>
-          <button className="btn ghost" onClick={onBack}>← Lists</button>
+          <button className="btn ghost small" onClick={onBack}><IconArrowLeft /> Lists</button>
           <span className="muted">
             Bucket: <strong>{BUCKET_LABELS[current.status]}</strong> ({bucketRemaining} left) · {done.length}/{total} reviewed
           </span>
@@ -97,9 +98,9 @@ export default function ReviewScreen({ listId, onBack }) {
         <div className="progress-bar"><div style={{ width: `${total ? (done.length / total) * 100 : 0}%` }} /></div>
         <LeadCard lead={current} />
         <div className="decision-row">
-          <button className="btn accept big" onClick={() => decide('accepted')} disabled={busy}>✓ Accept</button>
-          <button className="btn reject big" onClick={() => decide('rejected')} disabled={busy}>✕ Reject</button>
-          <button className="btn ghost" onClick={undo} disabled={busy || !done.length}>Undo last</button>
+          <button className="btn accept big" onClick={() => decide('accepted')} disabled={busy}><IconCheck /> Accept</button>
+          <button className="btn reject big" onClick={() => decide('rejected')} disabled={busy}><IconX /> Reject</button>
+          <button className="btn ghost" onClick={undo} disabled={busy || !done.length}><IconUndo /> Undo last</button>
         </div>
         {error && <p className="error">{error}</p>}
       </div>
