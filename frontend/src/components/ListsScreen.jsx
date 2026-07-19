@@ -6,7 +6,13 @@ export default function ListsScreen({ onOpen }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const load = () => fetchLists().then(setLists).catch((err) => setError(err.message));
+    const load = () =>
+      fetchLists()
+        .then((data) => {
+          setLists(data);
+          setError('');
+        })
+        .catch((err) => setError(err.message));
     load();
     const timer = setInterval(load, 5000);
     return () => clearInterval(timer);
