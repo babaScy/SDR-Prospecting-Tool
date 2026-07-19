@@ -40,8 +40,13 @@ export default function ListsScreen({ onOpen }) {
         <tbody>
           {lists.map((list) => {
             const c = list.counts;
+            const isRunning = list.status === 'pulling' || list.status === 'qualifying';
             return (
-              <tr key={list._id} onClick={() => onOpen(list._id)}>
+              <tr
+                key={list._id}
+                onClick={isRunning ? undefined : () => onOpen(list._id)}
+                style={isRunning ? { cursor: 'default' } : undefined}
+              >
                 <td>{list.name}</td>
                 <td>{list.pulledCount}</td>
                 <td>{c.qualified}</td>
@@ -52,6 +57,7 @@ export default function ListsScreen({ onOpen }) {
                 </td>
                 <td>
                   <span className={`badge ${list.status}`}>{list.status}</span>
+                  {isRunning && <span className="muted"> — still running</span>}
                 </td>
               </tr>
             );
