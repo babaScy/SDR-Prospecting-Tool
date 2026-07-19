@@ -1,6 +1,6 @@
 # Prospector — Handoff
 
-Standalone prospecting app, built external to WOLF+ (the `The-Wolf`/`wolf-frontend` project). Pulls companies from Apollo by count/region/ICP profile, AI-qualifies them with Claude using the same rubric WOLF+ uses, groups each pull into a **list**, and gives an SDR a review flow to accept/reject leads. Nothing downstream yet — no Clay push, no contact finding. This repo has its own git history (16 commits, `main` branch) split out of a WOLF+ working branch — WOLF+ itself no longer contains any of this code.
+Standalone prospecting app, built external to WOLF+ (the `The-Wolf`/`wolf-frontend` project). Pulls companies from Apollo by count/region/ICP profile, AI-qualifies them with Claude using the same rubric WOLF+ uses, groups each pull into a **list**, and gives an SDR a review flow to accept/reject leads. Nothing downstream yet — no HubSpot push, no contact finding. This repo has its own git history (16 commits, `main` branch) split out of a WOLF+ working branch — WOLF+ itself no longer contains any of this code.
 
 ## Layout
 
@@ -57,6 +57,6 @@ None of these block using the app — they're small, scoped cleanups for wheneve
 
 ## Next likely asks
 
-- Clay push for `sdrStatus: 'accepted'` companies (not connected yet)
+- HubSpot push for `sdrStatus: 'accepted'` companies (WOLF+'s `The-Wolf/services/hubspotService.js` has the dedup/insert pattern to reuse)
 - Contact/decision-maker finding (WOLF+'s `contactService.js` does this via Apollo people search + AI picking)
 - Deploying it somewhere the SDR can reach without your machine running

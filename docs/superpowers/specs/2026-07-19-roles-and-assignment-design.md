@@ -10,8 +10,8 @@ internal team tool with two roles:
   can see/review every list regardless of who it's assigned to.
 - **SDR** (`davidv@scytale.ai`, `danielp@scytale.ai`, `darrent@scytale.ai`,
   `jillianl@scytale.ai`, `khadym@scytale.ai`) — only sees and acts on lists
-  assigned to them, working leads toward being ready for Clay (not connected
-  yet — out of scope here).
+  assigned to them, working leads toward being ready for HubSpot (not
+  connected yet — out of scope here).
 
 ## Goals
 
@@ -27,7 +27,7 @@ internal team tool with two roles:
 - Real authentication (passwords, magic links, SSO) — out of scope. The
   allowlist approach is intentionally only as strong as team trust; revisit if
   the app becomes externally reachable or the team grows.
-- Clay integration — explicitly not connected yet. This project changes who
+- HubSpot integration — explicitly not connected yet. This project changes who
   can act on a list, not what happens after a lead is accepted.
 - Backfilling `assignedTo` on the 2 existing dev-data lists — they'll simply
   be admin-only-visible until someone reassigns them (out of scope; trivial to
@@ -169,6 +169,7 @@ grant access.
 
 ## Doc fix (incidental)
 
-`README.md`/`HANDOFF.md` currently say accepted leads "will later be pushed to
-HubSpot (not built yet)." Update to say Clay instead, matching current
-terminology — one-line correction, no functional change.
+`README.md`/`HANDOFF.md`'s "no auth" mention is now stale once this project
+ships — update it to reflect the new admin/SDR identity model. (The
+"HubSpot (not built yet)" line was briefly mis-edited to say "Clay" during
+this project and has been corrected back to HubSpot.)

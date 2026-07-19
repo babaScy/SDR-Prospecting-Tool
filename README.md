@@ -3,7 +3,7 @@
 Standalone prospecting app (external to WOLF+). Pulls companies from Apollo by
 count/region/ICP profile, AI-qualifies them against the Scytale ICP rubric
 (Claude), and gives an SDR a per-list accept/reject review flow. Accepted leads
-will later be pushed to Clay (not built yet).
+will later be pushed to HubSpot (not built yet).
 
 Spec: `../docs/superpowers/specs/2026-07-19-prospector-design.md`
 
