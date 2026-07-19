@@ -44,3 +44,21 @@ test('POST /api/pull returns 409 while a pull is running', async () => {
   assert.equal(res.status, 409);
   assert.equal(runPullCalls.length, 0);
 });
+
+test('POST /api/pull serializes concurrent requests (TOCTOU race)', async () => {
+  const body = { profile: 'icp1', region: 'uk', count: 10 };
+  const [resA, resB] = await Promise.all([
+    request(app).post('/api/pull').send(body),
+    request(app).post('/api/pull').send(body),
+  ]);
+
+  const statuses = [resA.status, resB.status].sort();
+  assert.deepEqual(statuses, [201, 409]);
+  assert.equal(runPullCalls.length, 1);
+
+  // Latch must release after the guarded section completes, allowing a
+  // subsequent request through once the running pull is cleared.
+  await List.deleteMany({});
+  const resC = await request(app).post('/api/pull').send(body);
+  assert.equal(resC.status, 201);
+});
