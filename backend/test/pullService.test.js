@@ -122,3 +122,30 @@ test('markStaleListsFailed flips pulling/qualifying lists to failed', async () =
   assert.equal(await List.countDocuments({ status: 'failed' }), 2);
   assert.equal(await List.countDocuments({ status: 'ready' }), 1);
 });
+
+test('collectCompanies skips orgs when enrich throws, continues with others', async () => {
+  const list = await makeList({ requestedCount: 3 });
+  const pages = [[org('a'), org('b'), org('c'), org('d')]];
+  // enrich throws for 'b', succeeds for others
+  const enrichWithFailure = async (id) => {
+    if (id === 'b') throw new Error('enrich boom');
+    return fakeEnrich(id);
+  };
+  // Stub console.error to avoid test output noise
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const saved = await collectCompanies(list, {
+      search: fakeSearch(pages),
+      enrich: enrichWithFailure,
+    });
+    assert.equal(saved, 3, 'should save 3 companies (a, c, d; b skipped)');
+    assert.equal(await Company.countDocuments({ listId: list._id }), 3);
+    const ids = (await Company.find({ listId: list._id }).sort('apolloAccountId'))
+      .map((c) => c.apolloAccountId);
+    assert.deepEqual(ids, ['a', 'c', 'd'], 'should save a, c, d but not b');
+    assert.equal(await Company.countDocuments({ apolloAccountId: 'b', listId: list._id }), 0);
+  } finally {
+    console.error = originalError;
+  }
+});
