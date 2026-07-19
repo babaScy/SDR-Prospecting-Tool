@@ -21,7 +21,14 @@ export default function ReviewScreen({ listId, onBack }) {
       .catch((err) => setError(err.message));
   }, [listId]);
 
-  if (error) return <p className="error">{error}</p>;
+  if (error && !queue) {
+    return (
+      <div className="panel">
+        <p className="error">{error}</p>
+        <button className="btn ghost" onClick={onBack}>← Lists</button>
+      </div>
+    );
+  }
   if (!queue) return <p className="muted">Loading…</p>;
 
   const current = queue[0];
@@ -62,6 +69,7 @@ export default function ReviewScreen({ listId, onBack }) {
     return (
       <div className="panel">
         <h2>Review complete 🎉</h2>
+        {error && <p className="error">{error}</p>}
         <div className="stat-row">
           <div className="stat"><span className="num">{accepted}</span><span className="label">accepted</span></div>
           <div className="stat"><span className="num">{rejected}</span><span className="label">rejected</span></div>
@@ -93,6 +101,7 @@ export default function ReviewScreen({ listId, onBack }) {
           <button className="btn reject big" onClick={() => decide('rejected')} disabled={busy}>✕ Reject</button>
           <button className="btn ghost" onClick={undo} disabled={busy || !done.length}>Undo last</button>
         </div>
+        {error && <p className="error">{error}</p>}
       </div>
     </div>
   );
