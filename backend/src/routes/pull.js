@@ -2,6 +2,9 @@ const express = require('express');
 const List = require('../models/List');
 const { REGIONS } = require('../config/filters');
 const pullService = require('../services/pullService');
+const USERS = require('../config/users');
+
+const SDR_EMAILS = USERS.filter((u) => u.role === 'sdr').map((u) => u.email);
 
 const router = express.Router();
 
@@ -18,7 +21,11 @@ const makeName = (profile, region) =>
   })}`;
 
 router.post('/', async (req, res, next) => {
-  const { profile, region, count } = req.body || {};
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only an admin can run a pull' });
+  }
+
+  const { profile, region, count, assignedTo } = req.body || {};
   if (!['icp1', 'icp2'].includes(profile)) {
     return res.status(400).json({ error: "profile must be 'icp1' or 'icp2'" });
   }
@@ -27,6 +34,9 @@ router.post('/', async (req, res, next) => {
   }
   if (!Number.isInteger(count) || count < 1 || count > 200) {
     return res.status(400).json({ error: 'count must be an integer between 1 and 200' });
+  }
+  if (!SDR_EMAILS.includes(assignedTo)) {
+    return res.status(400).json({ error: `assignedTo must be one of: ${SDR_EMAILS.join(', ')}` });
   }
 
   if (pullStarting) return res.status(409).json({ error: 'A pull is already running — wait for it to finish' });
@@ -40,6 +50,7 @@ router.post('/', async (req, res, next) => {
       profile,
       region,
       requestedCount: count,
+      assignedTo,
       status: 'pulling',
       lastMessage: 'Starting pull...',
     });

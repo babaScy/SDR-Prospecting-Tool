@@ -17,7 +17,7 @@ test('GET /api/health returns ok', async () => {
 });
 
 test('Company defaults: status pending, sdrStatus pending', async () => {
-  const list = await List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5 });
+  const list = await List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: 'davidv@scytale.ai' });
   const company = await Company.create({
     apolloAccountId: 'a1',
     companyName: 'Acme',
@@ -29,7 +29,7 @@ test('Company defaults: status pending, sdrStatus pending', async () => {
 
 test('List rejects invalid status', async () => {
   await assert.rejects(
-    List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5, status: 'bogus' }),
+    List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: 'davidv@scytale.ai', status: 'bogus' }),
     /validation/i
   );
 });

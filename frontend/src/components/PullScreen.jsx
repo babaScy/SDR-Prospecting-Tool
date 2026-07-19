@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { startPull, fetchLists, fetchList } from '../api';
+import USERS from '../users';
 
 const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus'];
 const RUNNING = ['pulling', 'qualifying'];
+const SDRS = USERS.filter((u) => u.role === 'sdr');
 
 export default function PullScreen() {
   const [profile, setProfile] = useState('icp1');
   const [region, setRegion] = useState('uk');
   const [count, setCount] = useState(20);
+  const [assignedTo, setAssignedTo] = useState(SDRS[0].email);
   const [activeList, setActiveList] = useState(null);
   const [error, setError] = useState('');
 
@@ -35,7 +38,7 @@ export default function PullScreen() {
     e.preventDefault();
     setError('');
     try {
-      setActiveList(await startPull(profile, region, Number(count)));
+      setActiveList(await startPull(profile, region, Number(count), assignedTo));
     } catch (err) {
       setError(err.message);
     }
@@ -65,6 +68,14 @@ export default function PullScreen() {
             <select value={profile} onChange={(e) => setProfile(e.target.value)}>
               <option value="icp1">ICP1 (1-50 employees)</option>
               <option value="icp2">ICP2 (51-250 employees)</option>
+            </select>
+          </label>
+          <label>
+            Assign to
+            <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+              {SDRS.map((u) => (
+                <option key={u.email} value={u.email}>{u.email}</option>
+              ))}
             </select>
           </label>
           <button className="btn" type="submit" disabled={isRunning}>

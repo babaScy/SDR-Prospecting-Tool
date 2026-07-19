@@ -12,6 +12,7 @@ const listSchema = new mongoose.Schema(
       required: true,
     },
     requestedCount: { type: Number, required: true },
+    assignedTo: { type: String, required: true },
     pulledCount: { type: Number, default: 0 },
     status: {
       type: String,

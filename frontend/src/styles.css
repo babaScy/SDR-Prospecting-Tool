@@ -66,6 +66,7 @@ th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--bo
 th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
 tbody tr { cursor: pointer; }
 tbody tr:hover { background: var(--panel-2); }
+.table-plain tbody tr { cursor: default; }
 
 .badge {
   display: inline-block; padding: 3px 10px; border-radius: 20px;

@@ -10,7 +10,7 @@ after(async () => db.disconnect());
 beforeEach(async () => db.clear());
 
 async function makeCompany() {
-  const list = await List.create({ name: 't', profile: 'icp1', region: 'uk', requestedCount: 1 });
+  const list = await List.create({ name: 't', profile: 'icp1', region: 'uk', requestedCount: 1, assignedTo: 'davidv@scytale.ai' });
   return Company.create({ apolloAccountId: 'a1', companyName: 'Acme', listId: list._id });
 }
 

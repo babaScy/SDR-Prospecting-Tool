@@ -13,20 +13,26 @@ router.post('/:id/decision', async (req, res, next) => {
     }
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Lead not found' });
 
+    const existing = await Company.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Lead not found' });
+
+    const ownerList = await List.findById(existing.listId);
+    if (req.user.role === 'sdr' && ownerList?.assignedTo !== req.user.email) {
+      return res.status(403).json({ error: 'Not your list' });
+    }
+
     const company = await Company.findByIdAndUpdate(
       req.params.id,
       { $set: { sdrStatus: decision, sdrReviewedAt: decision === 'pending' ? null : new Date() } },
       { new: true }
     );
-    if (!company) return res.status(404).json({ error: 'Lead not found' });
 
     // Flip the parent list between ready <-> reviewed based on remaining work.
-    const list = await List.findById(company.listId);
-    if (list && ['ready', 'reviewed'].includes(list.status)) {
+    if (ownerList && ['ready', 'reviewed'].includes(ownerList.status)) {
       const pendingLeft = await Company.countDocuments({ listId: company.listId, sdrStatus: 'pending' });
       const target = pendingLeft === 0 ? 'reviewed' : 'ready';
-      if (list.status !== target) {
-        await List.findByIdAndUpdate(list._id, { $set: { status: target } });
+      if (ownerList.status !== target) {
+        await List.findByIdAndUpdate(ownerList._id, { $set: { status: target } });
       }
     }
 

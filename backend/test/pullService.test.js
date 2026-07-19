@@ -20,7 +20,7 @@ const fakeSearch = (pages) => async (profile, region, page) => ({
 const fakeEnrich = async (id) => ({ ...org(id), industry: 'software' });
 
 const makeList = (overrides = {}) =>
-  List.create({ name: 't', profile: 'icp1', region: 'uk', requestedCount: 4, ...overrides });
+  List.create({ name: 't', profile: 'icp1', region: 'uk', requestedCount: 4, assignedTo: 'davidv@scytale.ai', ...overrides });
 
 test('collectCompanies saves requestedCount new companies and stops', async () => {
   const list = await makeList();

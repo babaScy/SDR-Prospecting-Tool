@@ -1,11 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const currentUser = require('./middleware/currentUser');
 
 const app = express();
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5174' }));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+app.use('/api', currentUser);
 
 // Routes are mounted as they are built (Tasks 5-6):
 app.use('/api/pull', require('./routes/pull'));
