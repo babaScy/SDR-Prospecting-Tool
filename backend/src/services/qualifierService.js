@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const Company = require('../models/Company');
+const { SYNC_THRESHOLD } = require('../config/pullConfig');
 
 let client;
 const getClient = () => (client ??= new Anthropic()); // reads ANTHROPIC_API_KEY from env
@@ -162,4 +163,41 @@ const qualifyCompaniesBatch = async (companies, onLog = () => {}) => {
   return resultsById;
 };
 
-module.exports = { qualifyCompaniesBatch, persistResult };
+// ─── Sync qualification (Messages API) — for tiny top-up chunks (< 3) ────────
+async function qualifyOneSync(company) {
+  const anthropic = getClient();
+  const msg = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2048,
+    system: systemBlocks,
+    tools,
+    messages: [{ role: 'user', content: buildUserMessage(company) }],
+  });
+  const submitCall = msg.content.find((b) => b.type === 'tool_use' && b.name === 'submit_result');
+  if (!submitCall) return { ok: false, error: 'no submit_result call' };
+  await persistResult(company, submitCall.input);
+  return { ok: true, data: { icp: submitCall.input.icp, tier: submitCall.input.tier } };
+}
+
+const qualifyCompaniesSync = async (companies, onLog = () => {}) => {
+  const resultsById = new Map();
+  for (const company of companies) {
+    await onLog(`Qualifying ${company.companyName} (sync)...`);
+    try {
+      resultsById.set(company._id.toString(), await qualifyOneSync(company));
+    } catch (err) {
+      resultsById.set(company._id.toString(), { ok: false, error: err.message });
+    }
+  }
+  return resultsById;
+};
+
+// Dispatcher: chunk < SYNC_THRESHOLD → sync; otherwise batch.
+const qualifyCompanies = async (companies, onLog = () => {}, deps = {}) => {
+  if (companies.length === 0) return new Map();
+  const sync = deps.sync || qualifyCompaniesSync;
+  const batch = deps.batch || qualifyCompaniesBatch;
+  return companies.length < SYNC_THRESHOLD ? sync(companies, onLog) : batch(companies, onLog);
+};
+
+module.exports = { qualifyCompaniesBatch, qualifyCompaniesSync, qualifyCompanies, persistResult };

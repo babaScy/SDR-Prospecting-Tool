@@ -13,6 +13,7 @@ const listSchema = new mongoose.Schema(
     },
     requestedCount: { type: Number, required: true },
     assignedTo: { type: String, required: true },
+    pullMode: { type: String, enum: ['fixed', 'quota'], default: 'fixed' },
     pulledCount: { type: Number, default: 0 },
     status: {
       type: String,

@@ -12,7 +12,7 @@ beforeEach(async () => db.clear());
 
 const admin = (req) => req.set('X-User-Email', 'yonia@scytale.ai');
 const asSdr = (req) => req.set('X-User-Email', 'davidv@scytale.ai');
-const asOtherSdr = (req) => req.set('X-User-Email', 'danielp@scytale.ai');
+const asOtherSdr = (req) => req.set('X-User-Email', 'khadym@scytale.ai');
 
 async function seedList(assignedTo = 'davidv@scytale.ai', idPrefix = '') {
   const list = await List.create({ name: 'UK · ICP1 · 19 Jul', profile: 'icp1', region: 'uk', requestedCount: 3, pulledCount: 3, assignedTo, status: 'ready' });
@@ -53,7 +53,7 @@ test('GET /api/lists returns lists with counts, newest first', async () => {
 
 test('GET /api/lists scopes SDRs to their own lists; admin sees all', async () => {
   await seedList('davidv@scytale.ai', 'x1-');
-  await seedList('danielp@scytale.ai', 'x2-');
+  await seedList('khadym@scytale.ai', 'x2-');
 
   const asDavid = await asSdr(request(app).get('/api/lists'));
   assert.equal(asDavid.status, 200);

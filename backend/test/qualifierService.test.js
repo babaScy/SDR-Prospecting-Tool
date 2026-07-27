@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const db = require('./helpers/db');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
-const { persistResult } = require('../src/services/qualifierService');
+const qs = require('../src/services/qualifierService');
+const { persistResult } = qs;
 
 before(async () => db.connect());
 after(async () => db.disconnect());
@@ -43,4 +44,16 @@ test('persistResult: No -> disqualified', async () => {
     icp: 'No', isB2B: 'No', isSaaS: 'No', isCompliant: 'Not confirmed', reasoning: 'consultancy',
   });
   assert.equal(updated.status, 'disqualified');
+});
+
+test('qualifyCompanies routes < 3 companies to sync, >= 3 to batch', async () => {
+  const calls = [];
+  const deps = {
+    sync:  async (c) => { calls.push(['sync', c.length]); return new Map(); },
+    batch: async (c) => { calls.push(['batch', c.length]); return new Map(); },
+  };
+  await qs.qualifyCompanies([{}, {}], () => {}, deps);        // 2 → sync
+  await qs.qualifyCompanies([{}, {}, {}], () => {}, deps);    // 3 → batch
+  await qs.qualifyCompanies([], () => {}, deps);              // 0 → no-op
+  assert.deepEqual(calls, [['sync', 2], ['batch', 3]]);
 });

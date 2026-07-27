@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import PullScreen from './components/PullScreen';
+import SdrPullScreen from './components/SdrPullScreen';
 import ListsScreen from './components/ListsScreen';
 import ListDetailScreen from './components/ListDetailScreen';
 import UserPicker from './components/UserPicker';
@@ -49,11 +50,9 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <nav>
-            {user.role === 'admin' && (
-              <button className={view.name === 'pull' ? 'active' : ''} onClick={() => setView({ name: 'pull' })}>
-                Pull
-              </button>
-            )}
+            <button className={view.name === 'pull' ? 'active' : ''} onClick={() => setView({ name: 'pull' })}>
+              Pull
+            </button>
             <button
               className={view.name === 'lists' || view.name === 'list' ? 'active' : ''}
               onClick={() => setView({ name: 'lists' })}
@@ -74,7 +73,7 @@ export default function App() {
         </div>
       </header>
       <main>
-        {view.name === 'pull' && user.role === 'admin' && <PullScreen />}
+        {view.name === 'pull' && (user.role === 'admin' ? <PullScreen /> : <SdrPullScreen />)}
         {view.name === 'lists' && (
           <ListsScreen isAdmin={user.role === 'admin'} onOpen={(listId) => setView({ name: 'list', listId })} />
         )}
