@@ -41,11 +41,13 @@ test('reserveItems hands out disjoint, contiguous ranges (atomic)', async () => 
 test('reserveItems handles a legacy integer cursor under concurrency without overlap', async () => {
   const key = 'apolloPage_icp1_uk';
   await PipelineState.create({ key, value: 3 }); // legacy page-number cursor
-  const [a, b] = await Promise.all([reserveItems(key, 10), reserveItems(key, 10)]);
-  const ranges = [a, b].sort((x, y) => x.start - y.start);
-  assert.equal(ranges[0].start, 50);            // seed (3-1)*25 = 50
-  assert.equal(ranges[1].start, ranges[0].end); // contiguous — no overlap, no gap
-  assert.equal((await readCursor(key)).next, 70);
+  const results = await Promise.all(Array.from({ length: 5 }, () => reserveItems(key, 10)));
+  const ranges = results.sort((a, b) => a.start - b.start);
+  assert.equal(ranges[0].start, 50); // seed (3-1)*25 = 50
+  for (let i = 1; i < ranges.length; i++) {
+    assert.equal(ranges[i].start, ranges[i - 1].end); // contiguous — no overlap, no gap
+  }
+  assert.equal((await readCursor(key)).next, 100); // 50 + 5*10
 });
 
 test('collectBatch does not skip: a top-up resumes at the next item', async () => {
