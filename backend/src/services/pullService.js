@@ -2,8 +2,13 @@ const List = require('../models/List');
 const Company = require('../models/Company');
 const PipelineState = require('../models/PipelineState');
 const apollo = require('./apolloService');
+const { makeLimiter } = require('../util/limiter');
+const { APOLLO_PER_PAGE, ENRICH_CONCURRENCY } = require('../config/pullConfig');
 
 const QUALIFY_CHUNK_SIZE = 30;
+
+// Shared across all pulls in this process — bounds concurrent Apollo enrich calls.
+const enrichLimiter = makeLimiter(ENRICH_CONCURRENCY);
 
 async function logProgress(listId, message) {
   console.log(`[pull] ${message}`);
@@ -13,47 +18,77 @@ async function logProgress(listId, message) {
   });
 }
 
-async function getCursor(key) {
-  const state = await PipelineState.findOneAndUpdate(
-    { key },
-    { $setOnInsert: { key, value: 1 } },
-    { upsert: true, new: true }
-  );
-  return state.value;
+const cursorKey = (list) => `apolloPage_${list.profile}_${list.region}`;
+
+// Reshape a legacy integer value (a page number) into the item-index shape.
+async function readCursor(key) {
+  const doc = await PipelineState.findOne({ key });
+  if (!doc) return { next: 0, perPage: APOLLO_PER_PAGE, totalItems: null };
+  if (typeof doc.value === 'number') {
+    const reshaped = { next: (doc.value - 1) * APOLLO_PER_PAGE, perPage: APOLLO_PER_PAGE, totalItems: null };
+    await PipelineState.updateOne({ key }, { $set: { value: reshaped } });
+    return reshaped;
+  }
+  return { perPage: APOLLO_PER_PAGE, totalItems: null, ...doc.value };
 }
 
-const setCursor = (key, value) => PipelineState.findOneAndUpdate({ key }, { $set: { value } });
+// Atomically reserve k item indices. Returns half-open [start, end).
+async function reserveItems(key, k) {
+  await readCursor(key); // reshape legacy docs before $inc on a nested path
+  const doc = await PipelineState.findOneAndUpdate(
+    { key }, { $inc: { 'value.next': k } }, { upsert: true, new: true }
+  );
+  const end = doc.value.next;
+  return { start: end - k, end };
+}
 
-// Pull Apollo pages until requestedCount NEW companies are saved, every page
-// has been visited once (full wrap), or an empty page arrives with no totals.
-async function collectCompanies(list, { search, enrich }) {
-  const stateKey = `apolloPage_${list.profile}_${list.region}`;
-  let page = await getCursor(stateKey);
-  let saved = 0;
-  let pagesVisited = 0;
-  let totalPages = Infinity;
+const setTotalItems = (key, totalItems) =>
+  PipelineState.updateOne({ key }, { $set: { 'value.totalItems': totalItems, 'value.perPage': APOLLO_PER_PAGE } });
 
-  while (saved < list.requestedCount && pagesVisited < totalPages) {
-    const { organizations, pagination } = await search(list.profile, list.region, page);
-    if (pagination.totalPages) totalPages = pagination.totalPages;
-    pagesVisited++;
+// Reserve exactly k item indices and save the new companies they map to.
+// Returns the number of NEW companies saved (may be < k due to dedup/enrich failures).
+async function collectBatch(list, k, { search, enrich }) {
+  if (k <= 0) return 0;
+  const key = cursorKey(list);
+  const { start, end } = await reserveItems(key, k);
+  let { totalItems } = await readCursor(key);
+  const perPage = APOLLO_PER_PAGE;
 
-    if (!organizations.length && !pagination.totalPages) break;
-
-    for (const org of organizations) {
-      if (saved >= list.requestedCount) break;
-      if (await Company.exists({ apolloAccountId: org.id })) continue;
-
-      let enriched;
-      try {
-        enriched = await enrich(org.id);
-      } catch (err) {
-        console.error(`[pull] enrich failed for ${org.id}: ${err.message}`);
-        continue;
+  const pageCache = new Map();
+  const getPage = async (page) => {
+    if (!pageCache.has(page)) {
+      const res = await search(list.profile, list.region, page, perPage);
+      if (res.pagination.totalEntries && !totalItems) {
+        totalItems = res.pagination.totalEntries;
+        await setTotalItems(key, totalItems);
       }
-      if (!enriched) continue;
+      pageCache.set(page, res.organizations);
+    }
+    return pageCache.get(page);
+  };
 
-      const hasDomain = Boolean(enriched.website_url || enriched.primary_domain);
+  let saved = 0;
+  for (let i = start; i < end; i++) {
+    const idx = totalItems ? i % totalItems : i;
+    const page = Math.floor(idx / perPage) + 1;
+    const offset = idx % perPage;
+    const orgs = await getPage(page);
+    const org = orgs[offset];
+    if (!org) continue; // past the end of available data
+
+    if (await Company.exists({ apolloAccountId: org.id })) continue;
+
+    let enriched;
+    try {
+      enriched = await enrichLimiter(() => enrich(org.id));
+    } catch (err) {
+      console.error(`[pull] enrich failed for ${org.id}: ${err.message}`);
+      continue;
+    }
+    if (!enriched) continue;
+
+    const hasDomain = Boolean(enriched.website_url || enriched.primary_domain);
+    try {
       await Company.create({
         ...apollo.mapOrganization(enriched),
         icpProfile: list.profile,
@@ -61,14 +96,25 @@ async function collectCompanies(list, { search, enrich }) {
         ...(hasDomain ? {} : { status: 'disqualified', disqualifyReason: 'No domain found on Apollo' }),
       });
       saved++;
+    } catch (err) {
+      if (err.code === 11000) continue; // lost a race — skip, do not fail the pull
+      throw err;
     }
+  }
+  return saved;
+}
 
-    page = totalPages !== Infinity && page >= totalPages ? 1 : page + 1;
-    await setCursor(stateKey, page);
+// Admin path: loop collectBatch toward requestedCount, stopping when a round
+// saves 0 (pool exhausted) so we never spin forever on a thin region.
+async function collectCompanies(list, { search, enrich }) {
+  let saved = 0;
+  while (saved < list.requestedCount) {
+    const round = await collectBatch(list, list.requestedCount - saved, { search, enrich });
+    saved += round;
     await List.findByIdAndUpdate(list._id, { $set: { pulledCount: saved } });
     await logProgress(list._id, `Pulled ${saved}/${list.requestedCount} new companies...`);
+    if (round === 0) break; // no new companies available this pass
   }
-
   return saved;
 }
 
@@ -116,4 +162,4 @@ async function markStaleListsFailed() {
   return result.modifiedCount;
 }
 
-module.exports = { runPull, collectCompanies, logProgress, markStaleListsFailed };
+module.exports = { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, markStaleListsFailed };
