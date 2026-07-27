@@ -27,10 +27,44 @@ test('POST /api/pull creates a list and fires runPull', async () => {
   assert.deepEqual(runPullCalls, [res.body._id]);
 });
 
-test('POST /api/pull rejects non-admin callers', async () => {
-  const res = await asSdr(request(app).post('/api/pull')).send({ profile: 'icp1', region: 'uk', count: 10, assignedTo: 'davidv@scytale.ai' });
+// davidv's regions are ['dach', 'uk'] per the roster.
+test('SDR can pull their own region (region+profile only)', async () => {
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.assignedTo, 'davidv@scytale.ai');
+  assert.equal(res.body.pullMode, 'quota');
+  assert.equal(runPullCalls.length, 1);
+});
+
+test('SDR pull ignores body assignedTo/count and forces self', async () => {
+  const res = await asSdr(request(app).post('/api/pull'))
+    .send({ region: 'uk', profile: 'icp1', assignedTo: 'khadym@scytale.ai', count: 999 });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.assignedTo, 'davidv@scytale.ai');
+});
+
+test('SDR cannot pull a region they do not cover', async () => {
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'aus', profile: 'icp1' });
   assert.equal(res.status, 403);
   assert.equal(runPullCalls.length, 0);
+});
+
+test('SDR pull is blocked at the daily quota (429)', async () => {
+  const list = await List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: 'davidv@scytale.ai', status: 'ready' });
+  const Company = require('../src/models/Company');
+  for (let i = 0; i < 5; i++) {
+    await Company.create({ apolloAccountId: `q${i}`, companyName: `q${i}`, listId: list._id, status: 'qualified' });
+  }
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 429);
+  assert.equal(runPullCalls.length, 0);
+});
+
+test('GET /api/pull/quota returns the SDR count', async () => {
+  const res = await asSdr(request(app).get('/api/pull/quota'));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.quota, 5);
+  assert.equal(res.body.qualifiedToday, 0);
 });
 
 test('POST /api/pull validates profile, region, count, assignedTo', async () => {
