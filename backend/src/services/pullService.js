@@ -2,8 +2,10 @@ const List = require('../models/List');
 const Company = require('../models/Company');
 const PipelineState = require('../models/PipelineState');
 const apollo = require('./apolloService');
+const quotaService = require('./quotaService');
 const { makeLimiter } = require('../util/limiter');
-const { APOLLO_PER_PAGE, ENRICH_CONCURRENCY } = require('../config/pullConfig');
+const { APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, DAILY_QUALIFIED_QUOTA, SESSION_MAX_PULLED } =
+  require('../config/pullConfig');
 
 const QUALIFY_CHUNK_SIZE = 30;
 
@@ -120,6 +122,49 @@ async function collectCompanies(list, { search, enrich }) {
   return saved;
 }
 
+// SDR self-serve path: first batch of FIRST_BATCH_SIZE, then top-ups of
+// (DAILY_QUALIFIED_QUOTA - qualifiedToday), qualifying each round's new
+// pending companies, until quota reached / safety cap / pool exhausted.
+async function runQuotaPull(list, deps = {}) {
+  const search = deps.search || apollo.searchCompaniesPage;
+  const enrich = deps.enrich || apollo.enrichOrganization;
+  // Lazy default: qualifierService is built in Task 6 and needs ANTHROPIC_API_KEY.
+  const qualify = deps.qualify || ((...args) => require('./qualifierService').qualifyCompanies(...args));
+  const qualifiedToday = deps.qualifiedToday || quotaService.qualifiedToday;
+
+  const sdr = list.assignedTo;
+  let pulledThisSession = 0;
+  let round = 0;
+
+  while (true) {
+    const already = await qualifiedToday(sdr);
+    if (already >= DAILY_QUALIFIED_QUOTA) break;
+    if (pulledThisSession >= SESSION_MAX_PULLED) break;
+
+    const want = round === 0 ? FIRST_BATCH_SIZE : DAILY_QUALIFIED_QUOTA - already;
+    const k = Math.min(want, SESSION_MAX_PULLED - pulledThisSession);
+    if (k <= 0) break;
+
+    await List.findByIdAndUpdate(list._id, { $set: { status: 'pulling' } });
+    await logProgress(list._id, `Round ${round + 1}: pulling ${k} companies...`);
+    const saved = await collectBatch(list, k, { search, enrich });
+    pulledThisSession += saved;
+    await List.findByIdAndUpdate(list._id, { $set: { status: 'qualifying', pulledCount: pulledThisSession } });
+
+    const pending = await Company.find({ listId: list._id, status: 'pending' });
+    if (pending.length) {
+      await logProgress(list._id, `Round ${round + 1}: qualifying ${pending.length} companies...`);
+      await qualify(pending, (msg) => logProgress(list._id, msg));
+    }
+
+    round++;
+    if (saved === 0) break; // pool exhausted for this region/profile
+  }
+
+  await List.findByIdAndUpdate(list._id, { $set: { status: 'ready' } });
+  await logProgress(list._id, 'List is ready for review.');
+}
+
 async function runPull(listId, deps = {}) {
   const search = deps.search || apollo.searchCompaniesPage;
   const enrich = deps.enrich || apollo.enrichOrganization;
@@ -130,6 +175,11 @@ async function runPull(listId, deps = {}) {
   try {
     const list = await List.findById(listId);
     if (!list) throw new Error(`List ${listId} not found`);
+
+    if (list.pullMode === 'quota') {
+      await runQuotaPull(list, deps);
+      return;
+    }
 
     const saved = await collectCompanies(list, { search, enrich });
     await List.findByIdAndUpdate(listId, { $set: { pulledCount: saved, status: 'qualifying' } });
@@ -164,4 +214,13 @@ async function markStaleListsFailed() {
   return result.modifiedCount;
 }
 
-module.exports = { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, markStaleListsFailed };
+module.exports = {
+  runPull,
+  runQuotaPull,
+  collectCompanies,
+  collectBatch,
+  reserveItems,
+  readCursor,
+  logProgress,
+  markStaleListsFailed,
+};

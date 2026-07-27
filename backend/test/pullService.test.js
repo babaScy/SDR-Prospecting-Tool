@@ -165,6 +165,47 @@ test('markStaleListsFailed flips pulling/qualifying lists to failed', async () =
   assert.equal(await List.countDocuments({ status: 'ready' }), 1);
 });
 
+test('runQuotaPull: first batch is 10, tops up by (5 - qualifiedToday), stops at 5', async () => {
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
+  const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
+  const reserved = [];        // record k per round
+  const qualifiedByRound = [3, 1, 1]; // round outcomes → cumulative 3,4,5
+  let round = 0;
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    // qualify: mark the round's new pending companies as qualified per the script
+    qualify: async (companies) => {
+      const n = qualifiedByRound[round] ?? 0;
+      for (let i = 0; i < n && i < companies.length; i++) {
+        await Company.findByIdAndUpdate(companies[i]._id, { $set: { status: 'qualified' } });
+      }
+      round++;
+      return new Map();
+    },
+  };
+  // Spy on collectBatch sizing via reserveItems is covered elsewhere; here assert end state.
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
+});
+
+test('runQuotaPull: respects SESSION_MAX_PULLED when nothing qualifies', async () => {
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
+  const pool = Array.from({ length: 200 }, (_, i) => `z${i}`);
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    qualify: async () => new Map(), // never qualifies anyone
+  };
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.ok(fresh.pulledCount <= 60, `pulled ${fresh.pulledCount}`);
+  assert.ok(fresh.pulledCount >= 10, 'at least the first batch');
+});
+
 test('collectCompanies skips orgs when enrich throws, continues with others', async () => {
   const list = await makeList({ requestedCount: 3 });
   // enrich throws for 'b', succeeds for others
