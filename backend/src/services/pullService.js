@@ -26,8 +26,10 @@ async function readCursor(key) {
   if (!doc) return { next: 0, perPage: APOLLO_PER_PAGE, totalItems: null };
   if (typeof doc.value === 'number') {
     const reshaped = { next: (doc.value - 1) * APOLLO_PER_PAGE, perPage: APOLLO_PER_PAGE, totalItems: null };
-    await PipelineState.updateOne({ key }, { $set: { value: reshaped } });
-    return reshaped;
+    // Conditional: only reshape while still numeric, so a concurrent reshape or $inc is never clobbered.
+    await PipelineState.updateOne({ key, value: { $type: 'number' } }, { $set: { value: reshaped } });
+    const fresh = await PipelineState.findOne({ key });
+    return { perPage: APOLLO_PER_PAGE, totalItems: null, ...fresh.value };
   }
   return { perPage: APOLLO_PER_PAGE, totalItems: null, ...doc.value };
 }

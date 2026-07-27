@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const db = require('./helpers/db');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
+const PipelineState = require('../src/models/PipelineState');
 const { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, markStaleListsFailed } =
   require('../src/services/pullService');
 
@@ -35,6 +36,16 @@ test('reserveItems hands out disjoint, contiguous ranges (atomic)', async () => 
   // no gaps, no overlaps
   for (let i = 1; i < ranges.length; i++) assert.equal(ranges[i].start, ranges[i - 1].end);
   assert.equal((await readCursor(key)).next, 25);
+});
+
+test('reserveItems handles a legacy integer cursor under concurrency without overlap', async () => {
+  const key = 'apolloPage_icp1_uk';
+  await PipelineState.create({ key, value: 3 }); // legacy page-number cursor
+  const [a, b] = await Promise.all([reserveItems(key, 10), reserveItems(key, 10)]);
+  const ranges = [a, b].sort((x, y) => x.start - y.start);
+  assert.equal(ranges[0].start, 50);            // seed (3-1)*25 = 50
+  assert.equal(ranges[1].start, ranges[0].end); // contiguous — no overlap, no gap
+  assert.equal((await readCursor(key)).next, 70);
 });
 
 test('collectBatch does not skip: a top-up resumes at the next item', async () => {
