@@ -1,6 +1,6 @@
 # Prospector — Handoff
 
-Standalone prospecting app, built external to WOLF+ (the `The-Wolf`/`wolf-frontend` project). Pulls companies from Apollo by count/region/ICP profile, AI-qualifies them with Claude using the same rubric WOLF+ uses, groups each pull into a **list**, and gives an SDR a review flow to accept/reject leads. Nothing downstream yet — no HubSpot push, no contact finding. This repo has its own git history (16 commits, `main` branch) split out of a WOLF+ working branch — WOLF+ itself no longer contains any of this code.
+Standalone prospecting app, built external to WOLF+ (the `The-Wolf`/`wolf-frontend` project). SDRs can self-serve pull companies from Apollo (region + ICP profile; system pulls in batches until 5 AI-qualified leads reached), or admins can assign count-based pulls to an SDR. AI-qualifies them with Claude using the same rubric WOLF+ uses, groups each pull into a **list**, and gives an SDR a review flow to accept/reject leads. Nothing downstream yet — no HubSpot push, no contact finding. This repo has its own git history (16 commits, `main` branch) split out of a WOLF+ working branch — WOLF+ itself no longer contains any of this code.
 
 ## Layout
 
@@ -36,7 +36,7 @@ Backend tests: `cd backend && npm test` (31/31 passing, in-memory Mongo, no real
 
 ## What's built
 
-- **Pull**: `POST /api/pull { profile, region, count }` → creates a List, runs in-process (Apollo search+enrich → Claude batch qualify), progress polled via `GET /api/lists/:id` (no SSE/WebSockets by design). One pull at a time (409 otherwise), max 200/pull.
+- **Pull**: Two modes: (1) **SDR self-serve**: `POST /api/pull { profile, region }` (no count) → creates a List, system pulls in batches (first 10, then top-ups) until 5 AI-qualified leads reached; daily quota 5 leads/SDR (resets midnight `Asia/Jerusalem`, 429 if exceeded); SDR must be assigned to region (403 otherwise). (2) **Admin**: `POST /api/pull { profile, region, count, sdrEmail }` → count-based pull assigned to specified SDR (no quota, no region check). Both run in-process (Apollo search+enrich → Claude batch qualify), progress polled via `GET /api/lists/:id` (no SSE/WebSockets by design). Multiple SDRs can pull simultaneously (per-SDR concurrency, atomic item-index cursor prevents skips/doubles) — replaced old single-global-pull serialization.
 - **Qualify**: Claude `claude-sonnet-4-6` via the Message Batches API, same ICP rubric/tools as WOLF+ (`backend/src/config/prompt.md`, copied verbatim). Verdict → `qualified` / `nei` (not enough info) / `disqualified`.
 - **Review**: SDR works a list bucket-by-bucket (qualified → nei → disqualified), sees company + domain + qualification reasoning + signals, hits Accept/Reject. Their decision (`sdrStatus`) is final and overrides the AI verdict. `POST /api/leads/:id/decision`.
 - **Frontend**: three screens — Pull, Lists (dashboard, polls every 5s), Review (bucket queue with undo).
