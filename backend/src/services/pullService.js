@@ -39,11 +39,21 @@ async function readCursor(key) {
 // Atomically reserve k item indices. Returns half-open [start, end).
 async function reserveItems(key, k) {
   await readCursor(key); // reshape legacy docs before $inc on a nested path
-  const doc = await PipelineState.findOneAndUpdate(
-    { key }, { $inc: { 'value.next': k } }, { upsert: true, new: true }
-  );
-  const end = doc.value.next;
-  return { start: end - k, end };
+  // The upsert can throw a transient E11000 when two pulls create the same
+  // brand-new cursor doc at the same instant. On retry the doc exists, so the
+  // $inc simply updates it — no create, no collision.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const doc = await PipelineState.findOneAndUpdate(
+        { key }, { $inc: { 'value.next': k } }, { upsert: true, new: true }
+      );
+      const end = doc.value.next;
+      return { start: end - k, end };
+    } catch (err) {
+      if (err.code === 11000 && attempt === 0) continue; // racing create — retry once
+      throw err;
+    }
+  }
 }
 
 const setTotalItems = (key, totalItems) =>

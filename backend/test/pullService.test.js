@@ -50,6 +50,32 @@ test('reserveItems handles a legacy integer cursor under concurrency without ove
   assert.equal((await readCursor(key)).next, 100); // 50 + 5*10
 });
 
+test('reserveItems retries once on a transient duplicate-key create race', async () => {
+  // Two pulls creating the same brand-new cursor doc at the same instant: one
+  // upsert wins, the other gets a transient E11000. Simulate by throwing 11000
+  // on the first findOneAndUpdate, then delegating to the real one.
+  const key = 'apolloPage_icp1_uk';
+  const realFOU = PipelineState.findOneAndUpdate.bind(PipelineState);
+  let calls = 0;
+  PipelineState.findOneAndUpdate = (...args) => {
+    calls += 1;
+    if (calls === 1) {
+      const err = new Error('E11000 duplicate key error');
+      err.code = 11000;
+      return Promise.reject(err);
+    }
+    return realFOU(...args);
+  };
+  try {
+    const { start, end } = await reserveItems(key, 10);
+    assert.equal(start, 0);
+    assert.equal(end, 10);
+    assert.ok(calls >= 2, 'should have retried after the simulated E11000');
+  } finally {
+    PipelineState.findOneAndUpdate = realFOU;
+  }
+});
+
 test('collectBatch does not skip: a top-up resumes at the next item', async () => {
   const list = await makeList();
   const deps = { search: fakeSearchFlat(['a', 'b', 'c', 'd', 'e']), enrich: fakeEnrich };
