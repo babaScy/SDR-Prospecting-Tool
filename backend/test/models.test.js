@@ -40,3 +40,11 @@ test('Company requires listId', async () => {
     /listId/
   );
 });
+
+test('List.pullMode defaults to fixed and accepts quota', async () => {
+  const List = require('../src/models/List');
+  const a = await List.create({ name: 'a', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: 'davidv@scytale.ai' });
+  assert.equal(a.pullMode, 'fixed');
+  const b = await List.create({ name: 'b', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: 'davidv@scytale.ai', pullMode: 'quota' });
+  assert.equal(b.pullMode, 'quota');
+});
