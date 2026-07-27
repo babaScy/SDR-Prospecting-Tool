@@ -37,7 +37,7 @@ test('recognized admin email sets req.user and calls next', () => {
   let nextCalled = false;
   currentUser(req, res, () => { nextCalled = true; });
   assert.equal(nextCalled, true);
-  assert.deepEqual(req.user, { email: 'yonia@scytale.ai', role: 'admin' });
+  assert.deepEqual(req.user, { email: 'yonia@scytale.ai', role: 'admin', regions: [] });
 });
 
 test('recognized sdr email sets req.user and calls next', () => {
@@ -46,5 +46,5 @@ test('recognized sdr email sets req.user and calls next', () => {
   let nextCalled = false;
   currentUser(req, res, () => { nextCalled = true; });
   assert.equal(nextCalled, true);
-  assert.deepEqual(req.user, { email: 'davidv@scytale.ai', role: 'sdr' });
+  assert.deepEqual(req.user, { email: 'davidv@scytale.ai', role: 'sdr', regions: ['dach', 'uk'] });
 });
