@@ -19,6 +19,11 @@ async function request(path, options = {}) {
 export const startPull = (profile, region, count, assignedTo) =>
   request('/api/pull', { method: 'POST', body: JSON.stringify({ profile, region, count, assignedTo }) });
 
+export const startSdrPull = (region, profile) =>
+  request('/api/pull', { method: 'POST', body: JSON.stringify({ region, profile }) });
+
+export const fetchQuota = () => request('/api/pull/quota');
+
 export const fetchLists = () => request('/api/lists');
 export const fetchList = (id) => request(`/api/lists/${id}`);
 export const fetchLeads = (id, bucket) =>
