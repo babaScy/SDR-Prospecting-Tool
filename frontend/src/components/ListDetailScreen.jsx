@@ -13,10 +13,14 @@ export default function ListDetailScreen({ listId, onBack }) {
 
   const load = () => fetchList(listId).then((l) => { setList(l); return l; }).catch(() => null);
   useEffect(() => {
-    load().then((l) => { if (l && ['sourcing', 'sourced'].includes(l.status)) setMode('contacts'); });
+    load().then((l) => {
+      if (l && (l.reviewConfirmedAt || ['sourcing', 'sourced'].includes(l.status))) setMode('contacts');
+    });
   }, [listId]);
 
-  const sourced = list && ['sourcing', 'sourced'].includes(list.status);
+  // Once review is confirmed the contacts view is the destination — including
+  // when sourcing failed part-way, since the contacts found so far are saved.
+  const sourced = Boolean(list?.reviewConfirmedAt) || ['sourcing', 'sourced'].includes(list?.status);
   // Card review has its own confirm gate — only offer it here on the table.
   const canConfirmHere = list?.status === 'reviewed' && mode === 'table';
   const accepted = list?.counts?.accepted ?? 0;

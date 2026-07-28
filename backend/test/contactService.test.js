@@ -62,3 +62,40 @@ test('sourceList marks the list failed on a thrown error', async () => {
   assert.equal(fresh.status, 'failed');
   assert.match(fresh.error, /apollo people down/);
 });
+
+test('sourceList isolates a per-company failure and finishes the rest', async () => {
+  const list = await List.create({ name: 'l', profile: 'icp1', region: 'uk', requestedCount: 2, assignedTo: 'davidv@scytale.ai', status: 'sourcing' });
+  const bad = await Company.create({ apolloAccountId: 'bad', companyName: 'AAA Bad', website: 'https://bad.com', listId: list._id, status: 'qualified', sdrStatus: 'accepted' });
+  const good = await Company.create({ apolloAccountId: 'good', companyName: 'ZZZ Good', website: 'https://good.com', listId: list._id, status: 'qualified', sdrStatus: 'accepted' });
+
+  const failing = {
+    ...deps,
+    search: async (domain) => {
+      if (domain === 'bad.com') throw new Error('boom on this one company');
+      return [{ id: 'p1', title: 'CTO' }];
+    },
+  };
+  await sourceList(list._id, failing);
+
+  const freshList = await List.findById(list._id);
+  assert.equal(freshList.status, 'sourced');            // list still completes
+  assert.equal((await Company.findById(bad._id)).contactStatus, 'none');   // bad one marked, not stranded
+  assert.equal((await Company.findById(good._id)).contactStatus, 'found'); // good one still sourced
+  assert.equal(await Contact.countDocuments({ companyId: good._id }), 1);
+});
+
+test('sourceList survives a duplicate person id from the picker', async () => {
+  const list = await List.create({ name: 'l', profile: 'icp1', region: 'uk', requestedCount: 1, assignedTo: 'davidv@scytale.ai', status: 'sourcing' });
+  const c = await Company.create({ apolloAccountId: 'd', companyName: 'Dup', website: 'https://dup.com', listId: list._id, status: 'qualified', sdrStatus: 'accepted' });
+  const dupPick = {
+    ...deps,
+    pick: async (enriched) => [
+      { person: enriched[0], rank: 1, isPrimary: true, reasoning: 'a' },
+      { person: enriched[0], rank: 2, isPrimary: false, reasoning: 'b' }, // same person twice
+    ],
+  };
+  await sourceList(list._id, dupPick);
+  assert.equal((await List.findById(list._id)).status, 'sourced');
+  assert.equal(await Contact.countDocuments({ companyId: c._id }), 1);
+  assert.equal((await Company.findById(c._id)).contactStatus, 'found');
+});

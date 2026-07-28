@@ -42,3 +42,27 @@ test('pickContacts caps at 4 even if AI returns more', async () => {
   const picks = await pickContacts(cands, company, { createMessage });
   assert.equal(picks.length, 4);
 });
+
+test('pickContacts dedupes when the model names the same person twice', async () => {
+  const cands = [{ id: 'dup', title: 'CTO' }, { id: 'other', title: 'CEO' }];
+  const createMessage = async () => ({ content: [{ type: 'tool_use', name: 'select_contacts', input: { contacts: [
+    { apolloPersonId: 'dup', reasoning: 'first' },
+    { apolloPersonId: 'dup', reasoning: 'again' },
+    { apolloPersonId: 'other', reasoning: 'third' },
+  ] } }] });
+  const picks = await pickContacts(cands, company, { createMessage });
+  assert.deepEqual(picks.map((p) => p.person.id), ['dup', 'other']);
+  assert.deepEqual(picks.map((p) => p.rank), [1, 2]); // ranks stay contiguous
+});
+
+test('pickContacts dedupes duplicate candidates from Apollo', async () => {
+  const cands = [{ id: 'x', title: 'CTO' }, { id: 'x', title: 'CTO' }];
+  const seen = [];
+  const createMessage = async (params) => {
+    seen.push(params.messages[0].content);
+    return { content: [{ type: 'tool_use', name: 'select_contacts', input: { contacts: [{ apolloPersonId: 'x', reasoning: 'r' }] } }] };
+  };
+  const picks = await pickContacts(cands, company, { createMessage });
+  assert.equal(picks.length, 1);
+  assert.equal((seen[0].match(/ID:x/g) || []).length, 1); // offered once, not twice
+});

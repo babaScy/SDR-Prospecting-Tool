@@ -38,9 +38,15 @@ const MAX_CONTACTS = 4;
 async function pickContacts(enrichedCandidates, company, deps = {}) {
   const createMessage = deps.createMessage || ((params) => getClient().messages.create(params));
 
-  const candidates = (enrichedCandidates || []).filter(
-    (p) => p && !EXCLUDED_TITLES.some((re) => re.test(p.title || ''))
-  );
+  // Dedupe by Apollo id: the search can return the same person twice, and two
+  // rows for one person would violate the unique {companyId, apolloPersonId} index.
+  const byId = new Map();
+  for (const p of enrichedCandidates || []) {
+    if (!p || !p.id) continue;
+    if (EXCLUDED_TITLES.some((re) => re.test(p.title || ''))) continue;
+    if (!byId.has(p.id)) byId.set(p.id, p);
+  }
+  const candidates = [...byId.values()];
   if (!candidates.length) return [];
 
   const list = candidates
@@ -68,9 +74,12 @@ Pick up to 4 best contacts for Scytale to reach out to, ranked best-first.`.trim
   if (!call) return [];
 
   const picks = [];
-  for (const chosen of (call.input.contacts || []).slice(0, MAX_CONTACTS)) {
+  const used = new Set();
+  for (const chosen of call.input.contacts || []) {
+    if (picks.length >= MAX_CONTACTS) break;
     const person = candidates.find((p) => p.id === chosen.apolloPersonId);
-    if (!person) continue;
+    if (!person || used.has(person.id)) continue; // model can name the same person twice
+    used.add(person.id);
     picks.push({ person, rank: picks.length + 1, isPrimary: picks.length === 0, reasoning: chosen.reasoning });
   }
   return picks;
@@ -97,7 +106,16 @@ async function sourceCompany(company, list, deps) {
 
   const enrichedById = await bulkMatch(people.map((person) => ({ person, domain })));
   const enriched = people.map((p) => enrichedById.get(p.id)).filter(Boolean);
-  const picks = await pick(enriched, company);
+  const chosen = await pick(enriched, company);
+
+  // Last line of defence for the unique {companyId, apolloPersonId} index —
+  // an injected picker could still hand back the same person twice.
+  const seen = new Set();
+  const picks = chosen.filter(({ person }) => {
+    if (!person?.id || seen.has(person.id)) return false;
+    seen.add(person.id);
+    return true;
+  });
 
   // delete-then-insert so a re-source is clean
   await Contact.deleteMany({ companyId: company._id });
@@ -131,11 +149,27 @@ async function sourceList(listId, deps = {}) {
     const accepted = await Company.find({ listId, sdrStatus: 'accepted' });
     await logProgress(listId, `Sourcing contacts for ${accepted.length} accepted companies...`);
 
+    // One company's failure must not strand the rest of the list.
+    let failures = 0;
+    let lastError = null;
     for (let i = 0; i < accepted.length; i++) {
       const company = accepted[i];
       await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'sourcing' } });
-      const n = await sourceCompany(company, list, deps);
-      await logProgress(listId, `Sourced ${i + 1}/${accepted.length}: ${company.companyName} — ${n} contact(s)`);
+      try {
+        const n = await sourceCompany(company, list, deps);
+        await logProgress(listId, `Sourced ${i + 1}/${accepted.length}: ${company.companyName} — ${n} contact(s)`);
+      } catch (err) {
+        failures += 1;
+        lastError = err;
+        await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'none' } });
+        console.error(`[contacts] ${company.companyName} failed: ${err.message}`);
+        await logProgress(listId, `Skipped ${i + 1}/${accepted.length}: ${company.companyName} — ${err.message}`);
+      }
+    }
+
+    // Every company failing means something systemic (API down, bad key) — fail the list.
+    if (accepted.length && failures === accepted.length) {
+      throw new Error(`all ${failures} companies failed — last error: ${lastError.message}`);
     }
 
     await List.findByIdAndUpdate(listId, { $set: { status: 'sourced' } });

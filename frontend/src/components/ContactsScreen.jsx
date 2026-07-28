@@ -65,6 +65,11 @@ export default function ContactsScreen({ listId }) {
             <div className="progress-bar indeterminate"><div /></div>
           </>
         )}
+        {list?.status === 'failed' && (
+          <p className="error">
+            Sourcing stopped early — any contacts found before it stopped are shown below. {list.error}
+          </p>
+        )}
       </div>
 
       {groups.map(({ company, contacts }) => (
