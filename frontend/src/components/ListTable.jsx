@@ -7,7 +7,6 @@ const SDR_LABELS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Reject
 
 const COLUMNS = [
   { key: 'companyName', label: 'Name' },
-  { key: 'tier', label: 'Tier' },
   { key: 'employees', label: 'Employees' },
   { key: 'country', label: 'Country' },
   { key: 'status', label: 'AI Verdict' },
@@ -115,7 +114,6 @@ export default function ListTable({ listId }) {
             {rows.map((lead) => (
               <tr key={lead._id}>
                 <td>{lead.companyName}</td>
-                <td>{lead.tier || '—'}</td>
                 <td>{lead.employees ?? '—'}</td>
                 <td>{lead.country || '—'}</td>
                 <td><span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span></td>

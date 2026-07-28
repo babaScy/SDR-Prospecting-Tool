@@ -176,7 +176,6 @@ Once you have gathered enough information, you MUST call the submit_result tool 
 
 Fields to populate:
 - icp: Yes / No / Not enough information
-- tier: A (strong fit) / B (moderate) / C (borderline) — only if icp is Yes
 - isB2B: Yes / No / Not enough information
 - isSaaS: Yes / No / Not enough information
 - isCompliant: Yes / Not confirmed

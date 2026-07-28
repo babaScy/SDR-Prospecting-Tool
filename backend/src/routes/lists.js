@@ -12,7 +12,6 @@ const BUCKETS = ['qualified', 'nei', 'disqualified'];
 const EMPTY_COUNTS = {
   total: 0, pendingAi: 0, qualified: 0, nei: 0, disqualified: 0,
   accepted: 0, rejected: 0, pendingSdr: 0,
-  tierA: 0, tierB: 0, tierC: 0,
 };
 
 const countIf = (field, value) => ({ $sum: { $cond: [{ $eq: [field, value] }, 1, 0] } });
@@ -31,9 +30,6 @@ async function countsByList(listIds) {
         accepted: countIf('$sdrStatus', 'accepted'),
         rejected: countIf('$sdrStatus', 'rejected'),
         pendingSdr: countIf('$sdrStatus', 'pending'),
-        tierA: countIf('$tier', 'A'),
-        tierB: countIf('$tier', 'B'),
-        tierC: countIf('$tier', 'C'),
       },
     },
   ]);
@@ -81,7 +77,7 @@ router.get('/:id/leads', async (req, res, next) => {
 
     const query = { listId: list._id, ...(bucket !== undefined ? { status: bucket } : {}) };
     const leads = await Company.find(query)
-      .sort({ tier: 1, companyName: 1 })
+      .sort({ companyName: 1 })
       .lean();
     res.json(leads);
   } catch (err) {
@@ -128,7 +124,7 @@ router.get('/:id/contacts', async (req, res, next) => {
       return res.status(403).json({ error: 'Not your list' });
     }
     const companies = await Company.find({ listId: list._id, sdrStatus: 'accepted' })
-      .select('companyName website tier contactStatus')
+      .select('companyName website contactStatus')
       .sort({ companyName: 1 }).lean();
     const contacts = await Contact.find({ listId: list._id }).sort({ rank: 1 }).lean();
     const byCompany = new Map();

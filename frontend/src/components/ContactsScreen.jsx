@@ -76,7 +76,6 @@ export default function ContactsScreen({ listId }) {
         <div className="panel" key={company._id}>
           <div className="contacts-company-head">
             <strong>{company.companyName}</strong>
-            {company.tier && <span className="badge">Tier {company.tier}</span>}
             {company.website && <a className="muted" href={company.website} target="_blank" rel="noreferrer">website</a>}
             <span className={`badge ${company.contactStatus}`}>{company.contactStatus}</span>
           </div>

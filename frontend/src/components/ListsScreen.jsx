@@ -35,11 +35,8 @@ export default function ListsScreen({ onOpen, isAdmin }) {
       pulled: acc.pulled + l.pulledCount,
       qualified: acc.qualified + l.counts.qualified,
       accepted: acc.accepted + l.counts.accepted,
-      tierA: acc.tierA + l.counts.tierA,
-      tierB: acc.tierB + l.counts.tierB,
-      tierC: acc.tierC + l.counts.tierC,
     }),
-    { pulled: 0, qualified: 0, accepted: 0, tierA: 0, tierB: 0, tierC: 0 }
+    { pulled: 0, qualified: 0, accepted: 0 }
   );
 
   return (
@@ -49,9 +46,6 @@ export default function ListsScreen({ onOpen, isAdmin }) {
           <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.pulled}</div><div className="label">pulled</div></div></div>
           <div className="stat-card tone-green"><div className="dot" /><div><div className="num">{totals.qualified}</div><div className="label">qualified</div></div></div>
           <div className="stat-card tone-primary"><div className="dot" /><div><div className="num">{totals.accepted}</div><div className="label">accepted</div></div></div>
-          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.tierA}</div><div className="label">tier A</div></div></div>
-          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.tierB}</div><div className="label">tier B</div></div></div>
-          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{totals.tierC}</div><div className="label">tier C</div></div></div>
         </div>
       </div>
       <div className="panel">

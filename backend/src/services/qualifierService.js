@@ -25,7 +25,6 @@ const tools = [
       type: 'object',
       properties: {
         icp: { type: 'string', enum: ['Yes', 'No', 'Not enough information'], description: 'Whether the company fits Scytale ICP' },
-        tier: { type: 'string', enum: ['A', 'B', 'C'], description: 'ICP fit strength. A = strong fit, B = moderate fit, C = weak/borderline fit. Only set if icp is Yes.' },
         isB2B: { type: 'string', enum: ['Yes', 'No', 'Not enough information'] },
         isSaaS: { type: 'string', enum: ['Yes', 'No', 'Not enough information'] },
         isCompliant: { type: 'string', enum: ['Yes', 'Not confirmed'], description: 'Whether the company explicitly mentions ISO 27001 or SOC 2 compliance' },
@@ -80,9 +79,6 @@ Once you have enough information, call submit_result with your findings.
 }
 
 async function persistResult(company, result) {
-  // tier is a top-level Company attribute; the rest is the qualification sub-doc.
-  const { tier, ...qualification } = result;
-
   let newStatus;
   if (result.icp === 'Yes') newStatus = 'qualified';
   else if (result.icp === 'Not enough information') newStatus = 'nei';
@@ -90,7 +86,7 @@ async function persistResult(company, result) {
 
   return Company.findByIdAndUpdate(
     company._id,
-    { $set: { status: newStatus, qualification, ...(tier ? { tier } : {}) } },
+    { $set: { status: newStatus, qualification: result } },
     { new: true }
   );
 }
@@ -148,7 +144,7 @@ const qualifyCompaniesBatch = async (companies, onLog = () => {}) => {
       if (submitCall) {
         try {
           await persistResult(company, submitCall.input);
-          resultsById.set(item.custom_id, { ok: true, data: { icp: submitCall.input.icp, tier: submitCall.input.tier } });
+          resultsById.set(item.custom_id, { ok: true, data: { icp: submitCall.input.icp } });
         } catch (err) {
           resultsById.set(item.custom_id, { ok: false, error: err.message });
         }
@@ -176,7 +172,7 @@ async function qualifyOneSync(company) {
   const submitCall = msg.content.find((b) => b.type === 'tool_use' && b.name === 'submit_result');
   if (!submitCall) return { ok: false, error: 'no submit_result call' };
   await persistResult(company, submitCall.input);
-  return { ok: true, data: { icp: submitCall.input.icp, tier: submitCall.input.tier } };
+  return { ok: true, data: { icp: submitCall.input.icp } };
 }
 
 const qualifyCompaniesSync = async (companies, onLog = () => {}) => {

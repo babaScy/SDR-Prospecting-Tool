@@ -41,7 +41,6 @@ const companySchema = new mongoose.Schema(
     companyLinkedinUrl: { type: String },
 
     icpProfile: { type: String, enum: ['icp1', 'icp2'] },
-    tier: { type: String, enum: ['A', 'B', 'C'] },
 
     // ── AI verdict ───────────────────────────────────────────────────────────
     status: {

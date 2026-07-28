@@ -21,9 +21,9 @@ async function seedList(assignedTo = 'davidv@scytale.ai', idPrefix = '') {
       apolloAccountId: `${idPrefix}${id}`, companyName: `Co ${id}`, website: `https://${idPrefix}${id}.com`,
       listId: list._id, status, qualification: { icp: 'Yes', reasoning: `reason ${id}` }, ...extra,
     });
-  const a = await mk('a', 'qualified', { tier: 'A' });
-  const b = await mk('b', 'nei', { tier: 'B' });
-  const c = await mk('c', 'disqualified', { tier: 'C' });
+  const a = await mk('a', 'qualified');
+  const b = await mk('b', 'nei');
+  const c = await mk('c', 'disqualified');
   return { list, a, b, c };
 }
 
@@ -46,9 +46,6 @@ test('GET /api/lists returns lists with counts, newest first', async () => {
   assert.equal(counts.nei, 1);
   assert.equal(counts.disqualified, 1);
   assert.equal(counts.pendingSdr, 3);
-  assert.equal(counts.tierA, 1);
-  assert.equal(counts.tierB, 1);
-  assert.equal(counts.tierC, 1);
 });
 
 test('GET /api/lists scopes SDRs to their own lists; admin sees all', async () => {
