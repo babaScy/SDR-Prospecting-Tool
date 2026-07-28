@@ -29,5 +29,8 @@ export const fetchList = (id) => request(`/api/lists/${id}`);
 export const fetchLeads = (id, bucket) =>
   request(`/api/lists/${id}/leads${bucket ? `?bucket=${bucket}` : ''}`);
 
+export const confirmReview = (id) => request(`/api/lists/${id}/confirm-review`, { method: 'POST' });
+export const fetchContacts = (id) => request(`/api/lists/${id}/contacts`);
+
 export const sendDecision = (leadId, decision) =>
   request(`/api/leads/${leadId}/decision`, { method: 'POST', body: JSON.stringify({ decision }) });
