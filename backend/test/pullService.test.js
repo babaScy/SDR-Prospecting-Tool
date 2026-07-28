@@ -191,6 +191,13 @@ test('markStaleListsFailed flips pulling/qualifying lists to failed', async () =
   assert.equal(await List.countDocuments({ status: 'ready' }), 1);
 });
 
+test('markStaleListsFailed also flips sourcing lists to failed', async () => {
+  await makeList({ status: 'sourcing' });
+  const n = await markStaleListsFailed();
+  assert.ok(n >= 1);
+  assert.equal(await List.countDocuments({ status: 'sourcing' }), 0);
+});
+
 test('runQuotaPull: first batch is 10, tops up by (5 - qualifiedToday), stops at 5', async () => {
   const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
   const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);

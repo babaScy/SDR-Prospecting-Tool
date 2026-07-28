@@ -218,8 +218,8 @@ async function runPull(listId, deps = {}) {
 // Startup recovery: the job runs in-process, so a restart strands running lists.
 async function markStaleListsFailed() {
   const result = await List.updateMany(
-    { status: { $in: ['pulling', 'qualifying'] } },
-    { $set: { status: 'failed', error: 'Server restarted mid-pull' } }
+    { status: { $in: ['pulling', 'qualifying', 'sourcing'] } },
+    { $set: { status: 'failed', error: 'Server restarted mid-job' } }
   );
   return result.modifiedCount;
 }
