@@ -45,7 +45,8 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="wordmark">
-          <div className="wordmark-mark" />
+          <img className="wordmark-logo" src="/scytale-wordmark.svg" alt="Scytale" />
+          <span className="wordmark-rule" />
           <span className="wordmark-text">Prospector</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>

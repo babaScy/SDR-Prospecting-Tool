@@ -54,10 +54,10 @@ export default function ContactsScreen({ listId }) {
     <div>
       <div className="panel">
         <div className="stat-row">
-          <div className="stat"><span className="num">{groups.length}</span><span className="label">accepted companies</span></div>
-          <div className="stat"><span className="num">{companiesWith}</span><span className="label">with contacts</span></div>
-          <div className="stat"><span className="num">{totalContacts}</span><span className="label">contacts</span></div>
-          <div className="stat"><span className="num">{emailable}</span><span className="label">emailable</span></div>
+          <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{groups.length}</div><div className="label">accepted companies</div></div></div>
+          <div className="stat-card tone-primary"><div className="dot" /><div><div className="num">{companiesWith}</div><div className="label">with contacts</div></div></div>
+          <div className="stat-card tone-primary"><div className="dot" /><div><div className="num">{totalContacts}</div><div className="label">contacts</div></div></div>
+          <div className="stat-card tone-green"><div className="dot" /><div><div className="num">{emailable}</div><div className="label">emailable</div></div></div>
         </div>
         {sourcing && (
           <>
