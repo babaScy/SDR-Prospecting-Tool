@@ -60,6 +60,13 @@ const companySchema = new mongoose.Schema(
       default: 'pending',
     },
     sdrReviewedAt: { type: Date },
+
+    // ── Contact sourcing (runs after the SDR confirms their review) ──────────
+    contactStatus: {
+      type: String,
+      enum: ['pending', 'sourcing', 'found', 'none'],
+      default: 'pending',
+    },
   },
   { timestamps: true }
 );

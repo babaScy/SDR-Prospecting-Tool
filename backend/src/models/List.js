@@ -17,9 +17,10 @@ const listSchema = new mongoose.Schema(
     pulledCount: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ['pulling', 'qualifying', 'ready', 'reviewed', 'failed'],
+      enum: ['pulling', 'qualifying', 'ready', 'reviewed', 'sourcing', 'sourced', 'failed'],
       default: 'pulling',
     },
+    reviewConfirmedAt: { type: Date }, // SDR locked their accept/reject decisions
     lastMessage: { type: String, default: '' },
     progressLog: { type: [String], default: [] }, // capped at last 50 via $slice on push
     error: { type: String },
