@@ -47,7 +47,9 @@ const enrichOrganization = async (id) => {
 const mapOrganization = (org) => ({
   apolloAccountId: org.id,
   companyName: org.name,
-  website: org.website_url || `https://${org.primary_domain}`,
+  // Only synthesise a URL when there is a domain to synthesise it from —
+  // otherwise this stored the literal string "https://null".
+  website: org.website_url || (org.primary_domain ? `https://${org.primary_domain}` : undefined),
   industry: org.industry,
   employees: org.estimated_num_employees,
   annualRevenue: org.organization_revenue_printed || org.annual_revenue_printed,

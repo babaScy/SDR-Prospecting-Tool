@@ -49,3 +49,15 @@ test('mapOrganization maps Apollo fields, falls back to primary_domain', () => {
   assert.equal(mapped.employees, 40);
   assert.deepEqual(mapped.technologies, ['AWS']);
 });
+
+test('mapOrganization leaves website unset when Apollo has no domain', () => {
+  const mapped = mapOrganization({ id: 'org9', name: 'NoWeb', website_url: null, primary_domain: null });
+  assert.ok(!mapped.website, `expected no website, got ${JSON.stringify(mapped.website)}`);
+  assert.notEqual(mapped.website, 'https://null');
+});
+
+test('mapOrganization leaves website unset when primary_domain is undefined', () => {
+  const mapped = mapOrganization({ id: 'org10', name: 'NoWeb2' });
+  assert.ok(!mapped.website, `expected no website, got ${JSON.stringify(mapped.website)}`);
+  assert.notEqual(mapped.website, 'https://undefined');
+});
