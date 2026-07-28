@@ -220,3 +220,5 @@ tbody tr:hover { background: var(--panel-2); }
 .chip.muted { color: var(--muted); opacity: 0.6; }
 .badge.found, .badge.sourced { background: rgba(52, 211, 153, 0.15); color: var(--green); }
 .badge.none, .badge.sourcing { background: rgba(124, 111, 238, 0.18); color: var(--primary); }
+.confirm-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.confirm-bar .error { margin: 6px 0 0; }

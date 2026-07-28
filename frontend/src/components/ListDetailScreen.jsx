@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { fetchList } from '../api';
-import { IconArrowLeft, IconTable, IconCards } from '../icons';
+import { fetchList, confirmReview } from '../api';
+import { IconArrowLeft, IconTable, IconCards, IconCheck } from '../icons';
 import ListTable from './ListTable';
 import ReviewScreen from './ReviewScreen';
 import ContactsScreen from './ContactsScreen';
@@ -8,6 +8,8 @@ import ContactsScreen from './ContactsScreen';
 export default function ListDetailScreen({ listId, onBack }) {
   const [list, setList] = useState(null);
   const [mode, setMode] = useState('table');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
 
   const load = () => fetchList(listId).then((l) => { setList(l); return l; }).catch(() => null);
   useEffect(() => {
@@ -15,6 +17,23 @@ export default function ListDetailScreen({ listId, onBack }) {
   }, [listId]);
 
   const sourced = list && ['sourcing', 'sourced'].includes(list.status);
+  // Card review has its own confirm gate — only offer it here on the table.
+  const canConfirmHere = list?.status === 'reviewed' && mode === 'table';
+  const accepted = list?.counts?.accepted ?? 0;
+
+  const doConfirm = async () => {
+    setConfirming(true);
+    setConfirmError('');
+    try {
+      await confirmReview(listId);
+      await load();
+      setMode('contacts');
+    } catch (err) {
+      setConfirmError(err.message);
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   return (
     <div>
@@ -39,6 +58,22 @@ export default function ListDetailScreen({ listId, onBack }) {
           )}
         </div>
       </div>
+      {canConfirmHere && (
+        <div className="panel confirm-bar">
+          <div>
+            <strong>All leads reviewed.</strong>{' '}
+            <span className="muted">
+              {accepted > 0
+                ? `Confirm to lock these decisions and find contacts for the ${accepted} accepted ${accepted === 1 ? 'company' : 'companies'}.`
+                : 'No accepted leads to source. Confirming just finalizes this list.'}
+            </span>
+            {confirmError && <p className="error">{confirmError}</p>}
+          </div>
+          <button className="btn accept" onClick={doConfirm} disabled={confirming}>
+            <IconCheck /> {confirming ? 'Confirming…' : 'Confirm list review'}
+          </button>
+        </div>
+      )}
       {mode === 'table' && <ListTable listId={listId} />}
       {mode === 'card' && (
         <ReviewScreen
