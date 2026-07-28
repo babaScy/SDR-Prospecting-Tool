@@ -36,3 +36,16 @@ test('bulkMatch batches by 10 and maps by id', async () => {
   assert.equal(map.get('p0').email, 'p0@x.com');
   assert.equal(map.size, 23);
 });
+
+test('domainFromWebsite rejects placeholder hostnames from a missing Apollo domain', () => {
+  // apolloService builds `https://${primary_domain}` — a missing domain yields these.
+  assert.equal(svc.domainFromWebsite('https://null'), null);
+  assert.equal(svc.domainFromWebsite('https://undefined'), null);
+  assert.equal(svc.domainFromWebsite('https://NULL'), null);
+});
+
+test('domainFromWebsite requires a dotted hostname', () => {
+  assert.equal(svc.domainFromWebsite('https://localhost'), null);
+  assert.equal(svc.domainFromWebsite('https://intranet'), null);
+  assert.equal(svc.domainFromWebsite('https://acme.co.uk/x'), 'acme.co.uk'); // still works
+});

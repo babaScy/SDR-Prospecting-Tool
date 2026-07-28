@@ -12,10 +12,18 @@ const headers = () => ({
   'Cache-Control': 'no-cache',
 });
 
+// `null`/`undefined` come from apolloService's `https://${primary_domain}` fallback
+// when Apollo has no domain for the company. Apollo silently ignores a bogus
+// domain filter and returns unrelated people, so these must never reach a search.
+const PLACEHOLDER_HOSTS = new Set(['null', 'undefined']);
+
 function domainFromWebsite(website) {
   if (!website) return null;
   try {
-    return new URL(website).hostname.replace(/^www\./, '');
+    const host = new URL(website).hostname.replace(/^www\./, '').toLowerCase();
+    if (PLACEHOLDER_HOSTS.has(host)) return null;
+    if (!host.includes('.')) return null; // not a real public domain
+    return host;
   } catch {
     return null;
   }
