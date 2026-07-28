@@ -4,6 +4,19 @@ import { IconCheck, IconX, IconUndo, IconArrowLeft } from '../icons';
 import LeadCard from './LeadCard';
 
 const BUCKETS = ['qualified', 'nei', 'disqualified'];
+
+// Same rule as the backend's domainFromWebsite: a company Apollo has no domain
+// for is stored as "https://null", which is not a real domain.
+function hasUsableDomain(website) {
+  if (!website) return false;
+  try {
+    const host = new URL(website).hostname.replace(/^www\./, '').toLowerCase();
+    return host !== 'null' && host !== 'undefined' && host.includes('.');
+  } catch {
+    return false;
+  }
+}
+
 const BUCKET_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified' };
 
 export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
@@ -103,6 +116,9 @@ export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
 
   const total = queue.length + done.length;
   const bucketRemaining = queue.filter((l) => l.status === current.status).length;
+  // Mirrors the backend rule: no usable domain means contacts can't be sourced,
+  // so accepting is refused (409). Keep the two in sync.
+  const noDomain = !hasUsableDomain(current.website);
 
   return (
     <div>
@@ -115,8 +131,20 @@ export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
         </div>
         <div className="progress-bar"><div style={{ width: `${total ? (done.length / total) * 100 : 0}%` }} /></div>
         <LeadCard lead={current} />
+        {noDomain && (
+          <p className="muted">
+            Apollo has no website domain for this company, so no contacts can be found for it — it can only be rejected.
+          </p>
+        )}
         <div className="decision-row">
-          <button className="btn accept big" onClick={() => decide('accepted')} disabled={busy}><IconCheck /> Accept</button>
+          <button
+            className="btn accept big"
+            onClick={() => decide('accepted')}
+            disabled={busy || noDomain}
+            title={noDomain ? 'No domain on Apollo — contacts cannot be sourced' : undefined}
+          >
+            <IconCheck /> Accept
+          </button>
           <button className="btn reject big" onClick={() => decide('rejected')} disabled={busy}><IconX /> Reject</button>
           <button className="btn ghost" onClick={undo} disabled={busy || !done.length}><IconUndo /> Undo last</button>
         </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const List = require('../models/List');
 const Company = require('../models/Company');
+const { domainFromWebsite } = require('../services/apolloPeopleService');
 
 const router = express.Router();
 
@@ -22,6 +23,13 @@ router.post('/:id/decision', async (req, res, next) => {
     }
     if (ownerList?.reviewConfirmedAt) {
       return res.status(409).json({ error: 'Review already confirmed — decisions are locked' });
+    }
+    // No domain means no contact sourcing is possible — accepting would just
+    // produce an accepted company nobody can be reached at.
+    if (decision === 'accepted' && !domainFromWebsite(existing.website)) {
+      return res.status(409).json({
+        error: 'This company has no website domain on Apollo, so no contacts can be found for it. It can only be rejected.',
+      });
     }
 
     const company = await Company.findByIdAndUpdate(

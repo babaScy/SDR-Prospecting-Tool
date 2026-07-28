@@ -71,3 +71,37 @@ test('GET contacts returns accepted companies with ranked contacts', async () =>
   assert.equal(res.body[0].contacts[0].rank, 1); // sorted by rank
   assert.equal(res.body[0].contacts.length, 2);
 });
+
+test('a company with no domain cannot be accepted (409)', async () => {
+  const list = await makeReviewed({ status: 'ready' });
+  const c = await Company.create({
+    apolloAccountId: 'nd1', companyName: 'NoDomain', website: 'https://null',
+    listId: list._id, status: 'disqualified', disqualifyReason: 'No domain found on Apollo',
+  });
+  const res = await asDavid(request(app).post(`/api/leads/${c._id}/decision`)).send({ decision: 'accepted' });
+  assert.equal(res.status, 409);
+  assert.match(res.body.error, /domain/i);
+  assert.equal((await Company.findById(c._id)).sdrStatus, 'pending'); // unchanged
+});
+
+test('a company with no domain can still be rejected', async () => {
+  const list = await makeReviewed({ status: 'ready' });
+  const c = await Company.create({
+    apolloAccountId: 'nd2', companyName: 'NoDomain2', website: 'https://null',
+    listId: list._id, status: 'disqualified',
+  });
+  const res = await asDavid(request(app).post(`/api/leads/${c._id}/decision`)).send({ decision: 'rejected' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.sdrStatus, 'rejected');
+});
+
+test('a company with a real domain can still be accepted', async () => {
+  const list = await makeReviewed({ status: 'ready' });
+  const c = await Company.create({
+    apolloAccountId: 'ok1', companyName: 'HasDomain', website: 'https://acme.com',
+    listId: list._id, status: 'disqualified', // disqualified but has a domain — SDR override allowed
+  });
+  const res = await asDavid(request(app).post(`/api/leads/${c._id}/decision`)).send({ decision: 'accepted' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.sdrStatus, 'accepted');
+});
