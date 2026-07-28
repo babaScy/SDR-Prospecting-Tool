@@ -1,5 +1,10 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { EXCLUDED_TITLES, PROFILE_CONTEXT, PICKER_SYSTEM_PROMPT } = require('../config/contactFilters');
+const List = require('../models/List');
+const Company = require('../models/Company');
+const Contact = require('../models/Contact');
+const apolloPeople = require('./apolloPeopleService');
+const { logProgress } = require('./pullService');
 
 let client;
 const getClient = () => (client ??= new Anthropic()); // reads ANTHROPIC_API_KEY
@@ -71,4 +76,75 @@ Pick up to 4 best contacts for Scytale to reach out to, ranked best-first.`.trim
   return picks;
 }
 
-module.exports = { pickContacts };
+// Source one company: Apollo people search -> bulk match -> AI pick -> save.
+// Returns the number of contacts saved.
+async function sourceCompany(company, list, deps) {
+  const search = deps.search || apolloPeople.searchCandidates;
+  const bulkMatch = deps.bulkMatch || apolloPeople.bulkMatch;
+  const pick = deps.pick || pickContacts;
+
+  const domain = apolloPeople.domainFromWebsite(company.website);
+  if (!domain) {
+    await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'none' } });
+    return 0;
+  }
+
+  const people = await search(domain);
+  if (!people.length) {
+    await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'none' } });
+    return 0;
+  }
+
+  const enrichedById = await bulkMatch(people.map((person) => ({ person, domain })));
+  const enriched = people.map((p) => enrichedById.get(p.id)).filter(Boolean);
+  const picks = await pick(enriched, company);
+
+  // delete-then-insert so a re-source is clean
+  await Contact.deleteMany({ companyId: company._id });
+  if (!picks.length) {
+    await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'none' } });
+    return 0;
+  }
+
+  await Contact.insertMany(picks.map(({ person, rank, isPrimary, reasoning }) => ({
+    companyId: company._id,
+    listId: list._id,
+    apolloPersonId: person.id,
+    domain,
+    firstName: person.first_name,
+    lastName: person.last_name,
+    title: person.title,
+    email: person.email || null,
+    linkedinUrl: person.linkedin_url || null,
+    phone: person.organization?.phone || null,
+    rank, isPrimary, reasoning,
+  })));
+  await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'found' } });
+  return picks.length;
+}
+
+async function sourceList(listId, deps = {}) {
+  try {
+    const list = await List.findById(listId);
+    if (!list) throw new Error(`List ${listId} not found`);
+
+    const accepted = await Company.find({ listId, sdrStatus: 'accepted' });
+    await logProgress(listId, `Sourcing contacts for ${accepted.length} accepted companies...`);
+
+    for (let i = 0; i < accepted.length; i++) {
+      const company = accepted[i];
+      await Company.findByIdAndUpdate(company._id, { $set: { contactStatus: 'sourcing' } });
+      const n = await sourceCompany(company, list, deps);
+      await logProgress(listId, `Sourced ${i + 1}/${accepted.length}: ${company.companyName} — ${n} contact(s)`);
+    }
+
+    await List.findByIdAndUpdate(listId, { $set: { status: 'sourced' } });
+    await logProgress(listId, 'Contacts ready.');
+  } catch (err) {
+    console.error(`[contacts] list ${listId} failed: ${err.message}`);
+    await List.findByIdAndUpdate(listId, { $set: { status: 'failed', error: err.message } });
+    await logProgress(listId, `Contact sourcing failed: ${err.message}`);
+  }
+}
+
+module.exports = { pickContacts, sourceList };
