@@ -3,14 +3,18 @@ import { fetchList } from '../api';
 import { IconArrowLeft, IconTable, IconCards } from '../icons';
 import ListTable from './ListTable';
 import ReviewScreen from './ReviewScreen';
+import ContactsScreen from './ContactsScreen';
 
 export default function ListDetailScreen({ listId, onBack }) {
   const [list, setList] = useState(null);
   const [mode, setMode] = useState('table');
 
+  const load = () => fetchList(listId).then((l) => { setList(l); return l; }).catch(() => null);
   useEffect(() => {
-    fetchList(listId).then(setList).catch(() => {});
+    load().then((l) => { if (l && ['sourcing', 'sourced'].includes(l.status)) setMode('contacts'); });
   }, [listId]);
+
+  const sourced = list && ['sourcing', 'sourced'].includes(list.status);
 
   return (
     <div>
@@ -23,12 +27,27 @@ export default function ListDetailScreen({ listId, onBack }) {
           <button className={mode === 'table' ? 'active' : ''} onClick={() => setMode('table')}>
             <IconTable /> Table
           </button>
-          <button className={mode === 'card' ? 'active' : ''} onClick={() => setMode('card')}>
-            <IconCards /> Card review
-          </button>
+          {!sourced && (
+            <button className={mode === 'card' ? 'active' : ''} onClick={() => setMode('card')}>
+              <IconCards /> Card review
+            </button>
+          )}
+          {sourced && (
+            <button className={mode === 'contacts' ? 'active' : ''} onClick={() => setMode('contacts')}>
+              Contacts
+            </button>
+          )}
         </div>
       </div>
-      {mode === 'table' ? <ListTable listId={listId} /> : <ReviewScreen listId={listId} onBack={onBack} />}
+      {mode === 'table' && <ListTable listId={listId} />}
+      {mode === 'card' && (
+        <ReviewScreen
+          listId={listId}
+          onBack={onBack}
+          onReviewConfirmed={() => load().then(() => setMode('contacts'))}
+        />
+      )}
+      {mode === 'contacts' && <ContactsScreen listId={listId} />}
     </div>
   );
 }

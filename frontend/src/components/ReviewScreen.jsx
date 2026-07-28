@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { fetchLeads, sendDecision } from '../api';
+import { fetchLeads, sendDecision, confirmReview } from '../api';
 import { IconCheck, IconX, IconUndo, IconArrowLeft } from '../icons';
 import LeadCard from './LeadCard';
 
 const BUCKETS = ['qualified', 'nei', 'disqualified'];
 const BUCKET_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified' };
 
-export default function ReviewScreen({ listId, onBack }) {
+export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
   const [queue, setQueue] = useState(null); // pending leads, bucket order
   const [done, setDone] = useState([]); // [{ lead, decision }]
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
 
   useEffect(() => {
     Promise.all(BUCKETS.map((bucket) => fetchLeads(listId, bucket)))
@@ -67,6 +69,16 @@ export default function ReviewScreen({ listId, onBack }) {
   if (!current) {
     const accepted = done.filter((d) => d.decision === 'accepted').length;
     const rejected = done.filter((d) => d.decision === 'rejected').length;
+    const doConfirm = async () => {
+      setConfirmError('');
+      try {
+        await confirmReview(listId);
+        setConfirmed(true);
+        onReviewConfirmed?.(); // parent switches to Contacts view
+      } catch (err) {
+        setConfirmError(err.message);
+      }
+    };
     return (
       <div className="panel">
         <h2>Review complete 🎉</h2>
@@ -75,9 +87,15 @@ export default function ReviewScreen({ listId, onBack }) {
           <div className="stat-card tone-green"><div className="dot" /><div><div className="num">{accepted}</div><div className="label">accepted</div></div></div>
           <div className="stat-card tone-neutral"><div className="dot" /><div><div className="num">{rejected}</div><div className="label">rejected</div></div></div>
         </div>
+        <div className="modal-note">
+          {accepted > 0
+            ? `Confirm to lock these decisions and find contacts for the ${accepted} accepted ${accepted === 1 ? 'company' : 'companies'}.`
+            : 'No accepted leads to source. Confirming just finalizes this list.'}
+        </div>
+        {confirmError && <p className="error">{confirmError}</p>}
         <div className="decision-row">
-          <button className="btn ghost" onClick={undo} disabled={busy || !done.length}><IconUndo /> Undo last</button>
-          <button className="btn" onClick={onBack}>Back to lists</button>
+          <button className="btn ghost" onClick={undo} disabled={busy || !done.length || confirmed}><IconUndo /> Undo last</button>
+          <button className="btn accept" onClick={doConfirm} disabled={confirmed}><IconCheck /> Confirm list review</button>
         </div>
       </div>
     );
