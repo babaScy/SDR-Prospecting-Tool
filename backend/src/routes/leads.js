@@ -20,6 +20,9 @@ router.post('/:id/decision', async (req, res, next) => {
     if (req.user.role === 'sdr' && ownerList?.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
+    if (ownerList?.reviewConfirmedAt) {
+      return res.status(409).json({ error: 'Review already confirmed — decisions are locked' });
+    }
 
     const company = await Company.findByIdAndUpdate(
       req.params.id,

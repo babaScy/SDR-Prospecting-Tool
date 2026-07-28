@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const List = require('../models/List');
 const Company = require('../models/Company');
+const Contact = require('../models/Contact');
+const contactService = require('../services/contactService');
 
 const router = express.Router();
 
@@ -82,6 +84,60 @@ router.get('/:id/leads', async (req, res, next) => {
       .sort({ tier: 1, companyName: 1 })
       .lean();
     res.json(leads);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Locks the SDR's accept/reject decisions and kicks off contact sourcing.
+router.post('/:id/confirm-review', async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'List not found' });
+    const list = await List.findById(req.params.id);
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+      return res.status(403).json({ error: 'Not your list' });
+    }
+    if (list.status !== 'reviewed') {
+      return res.status(409).json({ error: 'List is not fully reviewed' });
+    }
+
+    const acceptedCount = await Company.countDocuments({ listId: list._id, sdrStatus: 'accepted' });
+    const update = { reviewConfirmedAt: new Date(), status: acceptedCount > 0 ? 'sourcing' : 'sourced' };
+    const updated = await List.findByIdAndUpdate(list._id, { $set: update }, { new: true });
+
+    if (acceptedCount > 0) {
+      await Company.updateMany(
+        { listId: list._id, sdrStatus: 'accepted' },
+        { $set: { contactStatus: 'sourcing' } }
+      );
+      contactService.sourceList(list._id).catch((err) => console.error(`[contacts] unhandled: ${err.message}`));
+    }
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id/contacts', async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'List not found' });
+    const list = await List.findById(req.params.id).lean();
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+      return res.status(403).json({ error: 'Not your list' });
+    }
+    const companies = await Company.find({ listId: list._id, sdrStatus: 'accepted' })
+      .select('companyName website tier contactStatus')
+      .sort({ companyName: 1 }).lean();
+    const contacts = await Contact.find({ listId: list._id }).sort({ rank: 1 }).lean();
+    const byCompany = new Map();
+    for (const c of contacts) {
+      const k = String(c.companyId);
+      if (!byCompany.has(k)) byCompany.set(k, []);
+      byCompany.get(k).push(c);
+    }
+    res.json(companies.map((company) => ({ company, contacts: byCompany.get(String(company._id)) || [] })));
   } catch (err) {
     next(err);
   }
