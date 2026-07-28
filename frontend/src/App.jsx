@@ -45,7 +45,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="wordmark">
-          <img className="wordmark-logo" src="/scytale-wordmark.svg" alt="Scytale" />
+          <img className="wordmark-logo" src="/sales-logo-light.svg" alt="Scytale Sales" />
           <span className="wordmark-rule" />
           <span className="wordmark-text">Prospector</span>
         </div>
