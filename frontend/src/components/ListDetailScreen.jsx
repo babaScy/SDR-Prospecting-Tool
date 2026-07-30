@@ -78,7 +78,7 @@ export default function ListDetailScreen({ listId, onBack }) {
           </button>
         </div>
       )}
-      {mode === 'table' && <ListTable listId={listId} />}
+      {mode === 'table' && <ListTable listId={listId} onDecision={load} />}
       {mode === 'card' && (
         <ReviewScreen
           listId={listId}

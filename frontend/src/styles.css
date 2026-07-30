@@ -367,3 +367,91 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
     var(--panel);
 }
 .confirm-bar .error { margin: 6px 0 0; }
+
+/* ---------- Wolf landing splash ---------- */
+/* The traced wolf is black-on-transparent, so its alpha channel masks each
+   layer directly — the beams light up the black bars instead of outlining them. */
+.wolf-splash {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 26px; cursor: pointer;
+  background:
+    radial-gradient(58% 46% at 50% 44%, rgba(97, 98, 245, 0.2) 0%, rgba(0, 0, 0, 0) 72%),
+    linear-gradient(180deg, var(--scy-void) 0%, var(--scy-midnight) 46%, var(--scy-indigo-900) 100%);
+  animation: wolf-splash-out var(--wolf-fade, 320ms) var(--ease-out) var(--wolf-fade-delay, 1430ms) both;
+}
+
+/* Holds the clip geometry only; never painted. */
+.wolf-defs { position: absolute; width: 0; height: 0; }
+
+/* aspect-ratio comes from the artwork's viewBox, set inline by the component. */
+.wolf-stage { position: relative; height: min(74vh, 760px); }
+
+/* Both layers are clipped to the traced artwork, so the light lands inside the
+   black bars themselves rather than outlining them. A vector clip-path keeps the
+   hairlines crisp at any device pixel ratio — a rasterized mask-image does not. */
+.wolf-layer {
+  position: absolute; inset: 0;
+  -webkit-clip-path: url(#wolf-clip); clip-path: url(#wolf-clip);
+}
+
+/* Unlit line work — black, so each column lighting up is unmistakable. */
+.wolf-base { background: #000; }
+
+.wolf-lit { overflow: hidden; }
+
+/* One vertical slice of the fill. The paint is a double-height gradient — beam
+   colours in its lower half, a bright front band at the midpoint, transparent
+   above — and sliding it upward drags a glowing crest through the column. That
+   reads as light travelling rather than a block growing, and because the ramp is
+   purely vertical and identical per column, lit columns join seamlessly. */
+.wolf-col {
+  position: absolute; top: 0; bottom: 0;
+  background-image: linear-gradient(
+    to top,
+    var(--scy-pink) 0%,
+    var(--scy-indigo) 30%,
+    var(--scy-indigo-200) 46%,
+    rgba(232, 232, 255, 0.95) 50%,
+    rgba(232, 232, 255, 0) 54%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  background-size: 100% 200%;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  animation: wolf-col-fill var(--wolf-vein, 1120ms) cubic-bezier(0.4, 0.1, 0.3, 1) both;
+}
+
+/* Crest rises from the column's bottom edge to its top. */
+@keyframes wolf-col-fill {
+  from { background-position: 0 0%; }
+  to { background-position: 0 100%; }
+}
+
+.wolf-greeting {
+  margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600;
+  letter-spacing: -0.015em; color: var(--text-2);
+  animation: wolf-rise 600ms var(--ease-out) 860ms both;
+}
+.wolf-greeting strong {
+  background: var(--grad-brand); -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+.wolf-hint {
+  margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  animation: wolf-rise 600ms var(--ease-out) 1220ms both;
+}
+@keyframes wolf-rise {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes wolf-splash-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wolf-splash, .wolf-greeting, .wolf-hint { animation: none; }
+  .wolf-col { animation: none; background-position: 0 100%; }
+}

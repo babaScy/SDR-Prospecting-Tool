@@ -4,6 +4,7 @@ import SdrPullScreen from './components/SdrPullScreen';
 import ListsScreen from './components/ListsScreen';
 import ListDetailScreen from './components/ListDetailScreen';
 import UserPicker from './components/UserPicker';
+import WolfSplash from './components/WolfSplash';
 import { IconUndo } from './icons';
 import { USER_STORAGE_KEY } from './api';
 import USERS from './users';
@@ -20,6 +21,9 @@ function defaultView(user) {
 export default function App() {
   const [user, setUser] = useState(loadUser);
   const [view, setView] = useState(() => defaultView(loadUser()));
+  // Plays on a real sign-in and on landing with a restored session, so leaving
+  // and coming back to the app shows it again.
+  const [splash, setSplash] = useState(() => Boolean(loadUser()));
 
   useEffect(() => {
     const onUnauthorized = () => setUser(null);
@@ -32,14 +36,17 @@ export default function App() {
     const picked = USERS.find((u) => u.email === email);
     setUser(picked);
     setView(defaultView(picked));
+    setSplash(true);
   };
 
   const switchUser = () => {
     localStorage.removeItem(USER_STORAGE_KEY);
     setUser(null);
+    setSplash(false);
   };
 
   if (!user) return <UserPicker onPick={pickUser} />;
+  if (splash) return <WolfSplash user={user} onDone={() => setSplash(false)} />;
 
   return (
     <div className="app">

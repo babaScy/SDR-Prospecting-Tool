@@ -23,7 +23,7 @@ function compare(a, b, key) {
   return String(av).localeCompare(String(bv));
 }
 
-export default function ListTable({ listId }) {
+export default function ListTable({ listId, onDecision }) {
   const [leads, setLeads] = useState(null);
   const [error, setError] = useState('');
   const [verdictFilter, setVerdictFilter] = useState('all');
@@ -59,6 +59,9 @@ export default function ListTable({ listId }) {
     try {
       const updated = await sendDecision(lead._id, decision);
       setLeads((prev) => prev.map((l) => (l._id === lead._id ? { ...l, sdrStatus: updated.sdrStatus } : l)));
+      // The backend flips the list ready <-> reviewed off the last pending lead,
+      // so the parent has to re-read it for the confirm bar to appear here.
+      onDecision?.();
     } catch (err) {
       setError(err.message);
     } finally {
