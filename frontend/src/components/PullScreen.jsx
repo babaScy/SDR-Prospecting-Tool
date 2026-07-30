@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { startPull, fetchLists, fetchList } from '../api';
+import { startPull, fetchLists, fetchList, fetchQualificationMode, setQualificationMode as saveQualificationMode } from '../api';
 import USERS from '../users';
 
 const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus'];
@@ -13,6 +13,8 @@ export default function PullScreen() {
   const [assignedTo, setAssignedTo] = useState(SDRS[0].email);
   const [activeList, setActiveList] = useState(null);
   const [error, setError] = useState('');
+  const [qualificationMode, setQualificationModeState] = useState(null);
+  const [modeError, setModeError] = useState('');
 
   // On mount, pick up a pull that's already running (e.g. after a page refresh).
   useEffect(() => {
@@ -23,6 +25,22 @@ export default function PullScreen() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetchQualificationMode()
+      .then(({ mode }) => setQualificationModeState(mode))
+      .catch(() => {});
+  }, []);
+
+  const changeQualificationMode = async (mode) => {
+    setModeError('');
+    try {
+      const res = await saveQualificationMode(mode);
+      setQualificationModeState(res.mode);
+    } catch (err) {
+      setModeError(err.message);
+    }
+  };
 
   const isRunning = activeList && RUNNING.includes(activeList.status);
 
@@ -48,6 +66,25 @@ export default function PullScreen() {
 
   return (
     <div>
+      <div className="panel">
+        <h2>Qualification mode</h2>
+        <div className="form-row">
+          <label>
+            Claude qualification mode (affects all users)
+            <select
+              value={qualificationMode || ''}
+              onChange={(e) => changeQualificationMode(e.target.value)}
+              disabled={qualificationMode === null}
+            >
+              {qualificationMode === null && <option value="" disabled>Loading…</option>}
+              <option value="batch">Batch</option>
+              <option value="single">Single</option>
+            </select>
+          </label>
+        </div>
+        {modeError && <p className="error">{modeError}</p>}
+      </div>
+
       <div className="panel">
         <h2>Pull leads</h2>
         <form className="form-row" onSubmit={submit}>

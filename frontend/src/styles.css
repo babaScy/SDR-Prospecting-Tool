@@ -130,17 +130,17 @@ h2 { font-size: 26px; margin: 0 0 12px; }
 
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-.form-row label {
+.form-row label, .login-panel label {
   display: flex; flex-direction: column; gap: 6px;
   font-size: 12px; font-weight: 500; color: var(--muted);
   letter-spacing: 0.02em;
 }
-.form-row input, .form-row select {
+.form-row input, .form-row select, .login-panel input {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; min-width: 120px;
   font-family: inherit; transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
-.form-row input:focus, .form-row select:focus {
+.form-row input:focus, .form-row select:focus, .login-panel input:focus {
   outline: none; border-color: var(--primary); box-shadow: var(--glow-indigo-sm);
 }
 
@@ -290,6 +290,10 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
   display: flex; align-items: center; justify-content: center; color: var(--scy-indigo-200);
 }
 
+/* ── Company name → website link (list rows, cards, contacts) ─────────── */
+.company-link { color: var(--scy-indigo-200); text-decoration: none; }
+.company-link:hover { color: var(--text); text-decoration: underline; }
+
 /* ── Lead card / review ─────────────────────────────────────────────────── */
 .lead-card h2 { margin: 0 0 4px; font-size: 24px; }
 .lead-card a { color: var(--scy-indigo-200); text-decoration: none; }
@@ -306,15 +310,18 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .signal .v { font-size: 13px; line-height: 1.45; }
 .decision-row { display: flex; gap: 14px; margin-top: 20px; align-items: center; flex-wrap: wrap; }
 
-.picker-row {
-  display: flex; align-items: center; gap: 12px; cursor: pointer;
-  background: var(--panel-2); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 12px 14px;
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+/* ── Sign in ────────────────────────────────────────────────────────────── */
+.login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
 }
-.picker-row:hover { border-color: var(--border-brand); }
-.picker-row.selected { border-color: var(--primary); box-shadow: var(--glow-indigo-sm); }
-.picker-row-email { flex: 1; font-size: 14px; }
+.login-panel { width: 100%; max-width: 420px; margin-bottom: 0; }
+.login-panel h2 { margin: 0 0 6px; }
+.login-panel .muted { line-height: 1.6; }
+.login-panel .error { margin-bottom: 14px; }
+.login-panel input { min-width: 0; }
+.login-form { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.login-hint { font-size: 12px; margin: -4px 0 0; }
+.login-foot { font-size: 12px; margin: 16px 0 0; }
 
 /* ── Contact sourcing ───────────────────────────────────────────────────── */
 .modal-note { color: var(--muted); margin: 10px 0 4px; line-height: 1.6; }
@@ -325,6 +332,10 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
   border-bottom: 1px solid var(--border-strong); transition: color var(--dur-fast);
 }
 .contacts-company-head a:hover { color: var(--scy-indigo-200); border-color: var(--border-brand); }
+.contacts-company-head a.company-link {
+  font-size: inherit; color: var(--scy-indigo-200); border-bottom: none;
+}
+.contacts-company-head a.company-link:hover { color: var(--text); }
 .contacts-row { display: flex; flex-wrap: wrap; gap: 12px; }
 .contact-card {
   position: relative; flex: 1 1 220px; min-width: 220px; max-width: 300px; padding: 16px;

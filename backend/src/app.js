@@ -1,12 +1,18 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const currentUser = require('./middleware/currentUser');
 
 const app = express();
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5174' }));
+// credentials must be allowed for the session cookie to travel cross-origin.
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5174', credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Signing in has to be reachable without a session, so this mounts ahead of the guard.
+app.use('/api/auth', require('./routes/auth'));
 
 app.use('/api', currentUser);
 
@@ -14,6 +20,7 @@ app.use('/api', currentUser);
 app.use('/api/pull', require('./routes/pull'));
 app.use('/api/lists', require('./routes/lists'));
 app.use('/api/leads', require('./routes/leads'));
+app.use('/api/settings', require('./routes/settings'));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

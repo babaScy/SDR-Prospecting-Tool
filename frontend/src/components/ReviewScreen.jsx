@@ -2,20 +2,9 @@ import { useEffect, useState } from 'react';
 import { fetchLeads, sendDecision, confirmReview } from '../api';
 import { IconCheck, IconX, IconUndo, IconArrowLeft } from '../icons';
 import LeadCard from './LeadCard';
+import { hasUsableDomain } from '../utils/companyLink';
 
 const BUCKETS = ['qualified', 'nei', 'disqualified'];
-
-// Same rule as the backend's domainFromWebsite: a company Apollo has no domain
-// for is stored as "https://null", which is not a real domain.
-function hasUsableDomain(website) {
-  if (!website) return false;
-  try {
-    const host = new URL(website).hostname.replace(/^www\./, '').toLowerCase();
-    return host !== 'null' && host !== 'undefined' && host.includes('.');
-  } catch {
-    return false;
-  }
-}
 
 const BUCKET_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified' };
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchLeads, sendDecision } from '../api';
 import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../icons';
+import { getCompanyHref } from '../utils/companyLink';
 
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified', pending: 'Pending' };
 const SDR_LABELS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
@@ -114,9 +115,11 @@ export default function ListTable({ listId, onDecision }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((lead) => (
+            {rows.map((lead) => {
+              const companyHref = getCompanyHref(lead.website);
+              return (
               <tr key={lead._id}>
-                <td>{lead.companyName}</td>
+                <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
                 <td>{lead.employees ?? '—'}</td>
                 <td>{lead.country || '—'}</td>
                 <td><span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span></td>
@@ -138,7 +141,8 @@ export default function ListTable({ listId, onDecision }) {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       )}

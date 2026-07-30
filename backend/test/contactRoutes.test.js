@@ -2,6 +2,7 @@ const { test, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('./helpers/db');
+const { sessionCookie } = require('./helpers/auth');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
 const Contact = require('../src/models/Contact');
@@ -16,8 +17,8 @@ before(async () => db.connect());
 after(async () => db.disconnect());
 beforeEach(async () => { await db.clear(); sourceCalls.length = 0; });
 
-const asDavid = (req) => req.set('X-User-Email', 'davidv@scytale.ai');
-const asKhadym = (req) => req.set('X-User-Email', 'khadym@scytale.ai');
+const asDavid = (req) => req.set('Cookie', sessionCookie('davidv@scytale.ai'));
+const asKhadym = (req) => req.set('Cookie', sessionCookie('khadym@scytale.ai'));
 
 const makeReviewed = async (over = {}) =>
   List.create({ name: 'l', profile: 'icp1', region: 'uk', requestedCount: 2, assignedTo: 'davidv@scytale.ai', status: 'reviewed', ...over });

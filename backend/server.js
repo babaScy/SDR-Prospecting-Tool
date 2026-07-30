@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const REQUIRED_ENV = ['MONGODB_URI', 'ANTHROPIC_API_KEY', 'APOLLO_API_KEY', 'APOLLO_PEOPLE_KEY'];
+const REQUIRED_ENV = ['MONGODB_URI', 'ANTHROPIC_API_KEY', 'APOLLO_API_KEY', 'APOLLO_PEOPLE_KEY', 'SESSION_SECRET'];
 const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error(`Missing required environment variables: ${missing.join(', ')}`);

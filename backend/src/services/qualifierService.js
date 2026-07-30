@@ -188,12 +188,17 @@ const qualifyCompaniesSync = async (companies, onLog = () => {}) => {
   return resultsById;
 };
 
-// Dispatcher: chunk < SYNC_THRESHOLD → sync; otherwise batch.
+// Dispatcher: chunk < SYNC_THRESHOLD → sync; otherwise the admin-configured
+// qualification mode (batch/single), read fresh on every call so a mode
+// change takes effect immediately for all users.
 const qualifyCompanies = async (companies, onLog = () => {}, deps = {}) => {
   if (companies.length === 0) return new Map();
   const sync = deps.sync || qualifyCompaniesSync;
   const batch = deps.batch || qualifyCompaniesBatch;
-  return companies.length < SYNC_THRESHOLD ? sync(companies, onLog) : batch(companies, onLog);
+  if (companies.length < SYNC_THRESHOLD) return sync(companies, onLog);
+  const getMode = deps.getMode || require('./settingsService').getQualificationMode;
+  const mode = await getMode();
+  return mode === 'single' ? sync(companies, onLog) : batch(companies, onLog);
 };
 
 module.exports = { qualifyCompaniesBatch, qualifyCompaniesSync, qualifyCompanies, persistResult };

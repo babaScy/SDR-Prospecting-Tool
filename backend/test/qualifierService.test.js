@@ -43,14 +43,36 @@ test('persistResult: No -> disqualified', async () => {
   assert.equal(updated.status, 'disqualified');
 });
 
-test('qualifyCompanies routes < 3 companies to sync, >= 3 to batch', async () => {
+test('qualifyCompanies routes < 3 companies to sync regardless of mode', async () => {
   const calls = [];
   const deps = {
     sync:  async (c) => { calls.push(['sync', c.length]); return new Map(); },
     batch: async (c) => { calls.push(['batch', c.length]); return new Map(); },
+    getMode: async () => 'batch',
   };
-  await qs.qualifyCompanies([{}, {}], () => {}, deps);        // 2 → sync
-  await qs.qualifyCompanies([{}, {}, {}], () => {}, deps);    // 3 → batch
-  await qs.qualifyCompanies([], () => {}, deps);              // 0 → no-op
-  assert.deepEqual(calls, [['sync', 2], ['batch', 3]]);
+  await qs.qualifyCompanies([{}, {}], () => {}, deps);  // 2 → sync
+  await qs.qualifyCompanies([], () => {}, deps);        // 0 → no-op
+  assert.deepEqual(calls, [['sync', 2]]);
+});
+
+test('qualifyCompanies routes >= 3 companies to batch when mode is batch', async () => {
+  const calls = [];
+  const deps = {
+    sync:  async (c) => { calls.push(['sync', c.length]); return new Map(); },
+    batch: async (c) => { calls.push(['batch', c.length]); return new Map(); },
+    getMode: async () => 'batch',
+  };
+  await qs.qualifyCompanies([{}, {}, {}], () => {}, deps);
+  assert.deepEqual(calls, [['batch', 3]]);
+});
+
+test('qualifyCompanies routes >= 3 companies to sync when mode is single', async () => {
+  const calls = [];
+  const deps = {
+    sync:  async (c) => { calls.push(['sync', c.length]); return new Map(); },
+    batch: async (c) => { calls.push(['batch', c.length]); return new Map(); },
+    getMode: async () => 'single',
+  };
+  await qs.qualifyCompanies([{}, {}, {}], () => {}, deps);
+  assert.deepEqual(calls, [['sync', 3]]);
 });

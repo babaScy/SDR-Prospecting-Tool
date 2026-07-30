@@ -2,6 +2,7 @@ const { test, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('./helpers/db');
+const { sessionCookie } = require('./helpers/auth');
 const List = require('../src/models/List');
 const pullService = require('../src/services/pullService');
 const app = require('../src/app');
@@ -14,8 +15,8 @@ before(async () => db.connect());
 after(async () => db.disconnect());
 beforeEach(async () => { await db.clear(); runPullCalls.length = 0; });
 
-const admin = (req) => req.set('X-User-Email', 'yonia@scytale.ai');
-const asSdr = (req) => req.set('X-User-Email', 'davidv@scytale.ai');
+const admin = (req) => req.set('Cookie', sessionCookie('yonia@scytale.ai'));
+const asSdr = (req) => req.set('Cookie', sessionCookie('davidv@scytale.ai'));
 
 test('POST /api/pull creates a list and fires runPull', async () => {
   const res = await admin(request(app).post('/api/pull')).send({ profile: 'icp1', region: 'uk', count: 25, assignedTo: 'davidv@scytale.ai' });

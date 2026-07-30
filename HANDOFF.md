@@ -30,8 +30,35 @@ MONGODB_URI=<same value as The-Wolf/.env>
 APOLLO_API_KEY=<same value as The-Wolf/.env>
 APOLLO_PEOPLE_KEY=<same value as The-Wolf/.env — a DIFFERENT key to APOLLO_API_KEY>
 ANTHROPIC_API_KEY=<same value as The-Wolf/.env>
+SESSION_SECRET=<any long random string; rotating it signs everyone out>
 PORT=4000
 ```
+
+## Sign-in
+
+Email plus password, with no account picker. Only addresses in
+`backend/src/config/users.js` can sign in — that file stays the allowlist and
+the source of roles and regions; the `Credential` collection holds only the
+hashed secret. Identity is a signed httpOnly cookie, re-checked against the
+allowlist on every request, so removing someone from `users.js` ends their
+session immediately. The `X-User-Email` header is ignored — it used to *be* the
+identity, which let anyone impersonate anyone.
+
+Passwords are hashed with scrypt (Node built-in, memory-hard). Ten failed
+attempts locks an address for 15 minutes; a successful sign-in or an admin reset
+clears the lock.
+
+Admins issue passwords; there is no self-service reset:
+```
+node scripts/passwords.js init            # create for anyone missing one
+node scripts/passwords.js reset <email>   # new password for one person
+node scripts/passwords.js reset-all       # new password for everyone
+node scripts/passwords.js list            # who is set up (prints no secrets)
+```
+Generated passwords are shown once and never stored in the clear — if one is
+lost, reset it. Anyone holding an admin-issued password is forced to choose
+their own before reaching the app, and that is enforced by the API as well as
+the UI, so skipping the screen buys nothing.
 
 `APOLLO_PEOPLE_KEY` is a second Apollo credential (separate account/credit
 pool) used only for people search + bulk match during contact sourcing.

@@ -1,3 +1,5 @@
+import { getCompanyHref } from '../utils/companyLink';
+
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified' };
 
 function Signal({ label, value }) {
@@ -13,10 +15,11 @@ function Signal({ label, value }) {
 export default function LeadCard({ lead }) {
   const q = lead.qualification || {};
   const domain = lead.website?.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const companyHref = getCompanyHref(lead.website);
 
   return (
     <div className="lead-card">
-      <h2>{lead.companyName}</h2>
+      <h2>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</h2>
       <div className="lead-card-header">
         {lead.website && (
           <a href={lead.website} target="_blank" rel="noreferrer">{domain}</a>

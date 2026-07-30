@@ -2,6 +2,7 @@ const { test, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const db = require('./helpers/db');
+const { sessionCookie } = require('./helpers/auth');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
 const app = require('../src/app');
@@ -10,9 +11,9 @@ before(async () => db.connect());
 after(async () => db.disconnect());
 beforeEach(async () => db.clear());
 
-const admin = (req) => req.set('X-User-Email', 'yonia@scytale.ai');
-const asSdr = (req) => req.set('X-User-Email', 'davidv@scytale.ai');
-const asOtherSdr = (req) => req.set('X-User-Email', 'khadym@scytale.ai');
+const admin = (req) => req.set('Cookie', sessionCookie('yonia@scytale.ai'));
+const asSdr = (req) => req.set('Cookie', sessionCookie('davidv@scytale.ai'));
+const asOtherSdr = (req) => req.set('Cookie', sessionCookie('khadym@scytale.ai'));
 
 async function seedList(assignedTo = 'davidv@scytale.ai', idPrefix = '') {
   const list = await List.create({ name: 'UK · ICP1 · 19 Jul', profile: 'icp1', region: 'uk', requestedCount: 3, pulledCount: 3, assignedTo, status: 'ready' });
@@ -27,12 +28,16 @@ async function seedList(assignedTo = 'davidv@scytale.ai', idPrefix = '') {
   return { list, a, b, c };
 }
 
-test('requests without a recognized X-User-Email are rejected', async () => {
+test('requests without a valid session are rejected', async () => {
   await seedList();
-  const noHeader = await request(app).get('/api/lists');
-  assert.equal(noHeader.status, 401);
-  const unknown = await request(app).get('/api/lists').set('X-User-Email', 'nobody@scytale.ai');
+  const noSession = await request(app).get('/api/lists');
+  assert.equal(noSession.status, 401);
+  // Correctly signed, but the address is not in the user list.
+  const unknown = await request(app).get('/api/lists').set('Cookie', sessionCookie('nobody@scytale.ai'));
   assert.equal(unknown.status, 401);
+  // Regression: identity used to come from this header, so it must now be inert.
+  const spoofed = await request(app).get('/api/lists').set('X-User-Email', 'yonia@scytale.ai');
+  assert.equal(spoofed.status, 401);
 });
 
 test('GET /api/lists returns lists with counts, newest first', async () => {

@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react';
 import { startSdrPull, fetchQuota, fetchLists, fetchList } from '../api';
-import USERS from '../users';
-import { USER_STORAGE_KEY } from '../api';
 
 const RUNNING = ['pulling', 'qualifying'];
 
-export default function SdrPullScreen() {
-  const email = localStorage.getItem(USER_STORAGE_KEY);
-  const me = USERS.find((u) => u.email === email);
-  const regions = me?.regions || [];
-
+// Regions come from the authenticated session rather than being looked up
+// client-side; the backend enforces them again on every pull.
+export default function SdrPullScreen({ regions = [] }) {
   const [region, setRegion] = useState(regions[0] || '');
   const [profile, setProfile] = useState('icp1');
   const [activeList, setActiveList] = useState(null);

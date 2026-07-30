@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchContacts, fetchList } from '../api';
 import { IconMail, IconLinkedin, IconPhone, IconStar } from '../icons';
+import { getCompanyHref } from '../utils/companyLink';
 
 const RUNNING = ['sourcing'];
 const initials = (c) => `${(c.firstName || '?')[0] || ''}${(c.lastName || '')[0] || ''}`.toUpperCase() || '?';
@@ -72,10 +73,12 @@ export default function ContactsScreen({ listId }) {
         )}
       </div>
 
-      {groups.map(({ company, contacts }) => (
+      {groups.map(({ company, contacts }) => {
+        const companyHref = getCompanyHref(company.website);
+        return (
         <div className="panel" key={company._id}>
           <div className="contacts-company-head">
-            <strong>{company.companyName}</strong>
+            <strong>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{company.companyName}</a> : company.companyName}</strong>
             {company.website && <a className="muted" href={company.website} target="_blank" rel="noreferrer">website</a>}
             <span className={`badge ${company.contactStatus}`}>{company.contactStatus}</span>
           </div>
@@ -83,7 +86,8 @@ export default function ContactsScreen({ listId }) {
             ? <div className="contacts-row">{contacts.map((c) => <ContactCard key={c._id} c={c} />)}</div>
             : <p className="muted">No decision-maker found.</p>}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

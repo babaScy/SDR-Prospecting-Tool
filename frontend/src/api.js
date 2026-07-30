@@ -1,20 +1,42 @@
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-export const USER_STORAGE_KEY = 'prospectorUser';
 
+// Identity lives in an httpOnly session cookie the browser holds and JavaScript
+// cannot read, so it travels via credentials rather than a header we set.
 async function request(path, options = {}) {
-  const email = localStorage.getItem(USER_STORAGE_KEY);
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(email ? { 'X-User-Email': email } : {}) },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     ...options,
   });
   const body = await res.json().catch(() => ({}));
-  if (res.status === 401) {
-    localStorage.removeItem(USER_STORAGE_KEY);
-    window.dispatchEvent(new Event('prospector:unauthorized'));
-  }
+  if (res.status === 401) window.dispatchEvent(new Event('prospector:unauthorized'));
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
   return body;
 }
+
+export const login = (email, password) =>
+  request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+
+export const changePassword = (currentPassword, newPassword) =>
+  request('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+export const adminResetPassword = (email) =>
+  request('/api/auth/admin/reset-password', { method: 'POST', body: JSON.stringify({ email }) });
+
+// Resolves to the signed-in user, or null when there is no valid session.
+export const fetchMe = async () => {
+  try {
+    return await request('/api/auth/me');
+  } catch {
+    return null;
+  }
+};
+
+export const logout = () =>
+  fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' });
 
 export const startPull = (profile, region, count, assignedTo) =>
   request('/api/pull', { method: 'POST', body: JSON.stringify({ profile, region, count, assignedTo }) });
@@ -23,6 +45,10 @@ export const startSdrPull = (region, profile) =>
   request('/api/pull', { method: 'POST', body: JSON.stringify({ region, profile }) });
 
 export const fetchQuota = () => request('/api/pull/quota');
+
+export const fetchQualificationMode = () => request('/api/settings/qualification-mode');
+export const setQualificationMode = (mode) =>
+  request('/api/settings/qualification-mode', { method: 'PUT', body: JSON.stringify({ mode }) });
 
 export const fetchLists = () => request('/api/lists');
 export const fetchList = (id) => request(`/api/lists/${id}`);
