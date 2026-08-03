@@ -4,8 +4,10 @@ const PipelineState = require('../models/PipelineState');
 const apollo = require('./apolloService');
 const quotaService = require('./quotaService');
 const { makeLimiter } = require('../util/limiter');
-const { APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, DAILY_QUALIFIED_QUOTA, SESSION_MAX_PULLED } =
-  require('../config/pullConfig');
+const {
+  APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, DAILY_QUALIFIED_QUOTA, SESSION_MAX_PULLED,
+  MAX_CONSECUTIVE_EMPTY_ROUNDS,
+} = require('../config/pullConfig');
 
 const QUALIFY_CHUNK_SIZE = 30;
 
@@ -145,6 +147,7 @@ async function runQuotaPull(list, deps = {}) {
   const sdr = list.assignedTo;
   let pulledThisSession = 0;
   let round = 0;
+  let emptyRounds = 0;
 
   while (true) {
     const already = await qualifiedToday(sdr);
@@ -168,7 +171,19 @@ async function runQuotaPull(list, deps = {}) {
     }
 
     round++;
-    if (saved === 0) break; // pool exhausted for this region/profile
+    if (saved === 0) {
+      // A single empty round just means the handful of items reserved this
+      // round happened to be dupes/enrich failures — not proof the pool is
+      // dry, especially near quota where a round can be as small as 1 item.
+      // Only give up after several in a row.
+      emptyRounds++;
+      if (emptyRounds >= MAX_CONSECUTIVE_EMPTY_ROUNDS) {
+        await logProgress(list._id, `No new companies after ${emptyRounds} empty rounds — pool exhausted for this region/profile.`);
+        break;
+      }
+    } else {
+      emptyRounds = 0;
+    }
   }
 
   await List.findByIdAndUpdate(list._id, { $set: { status: 'ready' } });

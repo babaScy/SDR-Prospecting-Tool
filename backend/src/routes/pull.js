@@ -26,7 +26,8 @@ router.get('/quota', async (req, res, next) => {
   try {
     if (req.user.role !== 'sdr') return res.status(403).json({ error: 'SDR only' });
     const qualifiedToday = await quotaService.qualifiedToday(req.user.email);
-    res.json({ qualifiedToday, quota: DAILY_QUALIFIED_QUOTA });
+    const pulledToday = await quotaService.pulledToday(req.user.email);
+    res.json({ qualifiedToday, quota: DAILY_QUALIFIED_QUOTA, pulledToday });
   } catch (err) {
     next(err);
   }
@@ -44,6 +45,9 @@ async function sdrPull(req, res, next) {
   }
   if (!['icp1', 'icp2'].includes(profile)) {
     return res.status(400).json({ error: "profile must be 'icp1' or 'icp2'" });
+  }
+  if (await quotaService.pulledToday(req.user.email)) {
+    return res.status(429).json({ error: 'You can only start one pull per day — resets at midnight' });
   }
   if (await quotaService.quotaReached(req.user.email)) {
     return res.status(429).json({ error: 'Daily limit reached — resets at midnight' });

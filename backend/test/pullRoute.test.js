@@ -61,11 +61,33 @@ test('SDR pull is blocked at the daily quota (429)', async () => {
   assert.equal(runPullCalls.length, 0);
 });
 
+test('SDR pull is blocked once they already have a self-serve list today, even under quota (429)', async () => {
+  // Simulates the pool-exhaustion edge case: a quota-mode list that ended
+  // short of the daily quota should still count as "today's pull".
+  await List.create({
+    name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5,
+    assignedTo: 'davidv@scytale.ai', pullMode: 'quota', status: 'ready',
+  });
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 429);
+  assert.equal(runPullCalls.length, 0);
+});
+
+test('an admin-assigned (fixed) pull today does not block the SDR\'s own self-serve pull', async () => {
+  await List.create({
+    name: 'x', profile: 'icp1', region: 'uk', requestedCount: 25,
+    assignedTo: 'davidv@scytale.ai', pullMode: 'fixed', status: 'ready',
+  });
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 201);
+});
+
 test('GET /api/pull/quota returns the SDR count', async () => {
   const res = await asSdr(request(app).get('/api/pull/quota'));
   assert.equal(res.status, 200);
   assert.equal(res.body.quota, 5);
   assert.equal(res.body.qualifiedToday, 0);
+  assert.equal(res.body.pulledToday, false);
 });
 
 test('POST /api/pull validates profile, region, count, assignedTo', async () => {

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const db = require('./helpers/db');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
-const { qualifiedToday, quotaReached } = require('../src/services/quotaService');
+const { qualifiedToday, quotaReached, pulledToday } = require('../src/services/quotaService');
 
 before(async () => db.connect());
 after(async () => db.disconnect());
@@ -43,4 +43,32 @@ test('quotaReached is true at 5, false at 4', async () => {
   await db.clear();
   await seed(sdr, five.slice(0, 4));
   assert.equal(await quotaReached(sdr, now), false);
+});
+
+test('pulledToday is false with no lists yet', async () => {
+  assert.equal(await pulledToday(sdr, now), false);
+});
+
+test('pulledToday is true after today\'s self-serve (quota-mode) list — even short of quota', async () => {
+  await List.create({
+    name: 't', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: sdr,
+    pullMode: 'quota', status: 'ready', createdAt: now,
+  });
+  assert.equal(await pulledToday(sdr, now), true);
+});
+
+test('pulledToday ignores an admin-assigned (fixed) pull', async () => {
+  await List.create({
+    name: 't', profile: 'icp1', region: 'uk', requestedCount: 25, assignedTo: sdr,
+    pullMode: 'fixed', status: 'ready', createdAt: now,
+  });
+  assert.equal(await pulledToday(sdr, now), false);
+});
+
+test('pulledToday ignores a quota-mode list from a previous day', async () => {
+  await List.create({
+    name: 't', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: sdr,
+    pullMode: 'quota', status: 'ready', createdAt: new Date('2026-07-20T10:00:00Z'),
+  });
+  assert.equal(await pulledToday(sdr, now), false);
 });

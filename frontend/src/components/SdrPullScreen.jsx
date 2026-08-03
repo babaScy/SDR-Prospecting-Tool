@@ -35,6 +35,8 @@ export default function SdrPullScreen({ regions = [] }) {
   }, [isRunning, activeList?._id]);
 
   const atQuota = quota && quota.qualifiedToday >= quota.quota;
+  const alreadyPulledToday = Boolean(quota?.pulledToday);
+  const blocked = atQuota || alreadyPulledToday;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -55,7 +57,11 @@ export default function SdrPullScreen({ regions = [] }) {
         {quota && (
           <p className="muted">
             <strong>{quota.qualifiedToday} / {quota.quota}</strong> qualified today
-            {atQuota ? ' — daily limit reached, resets at midnight' : ''}
+            {atQuota
+              ? ' — daily limit reached, resets at midnight'
+              : alreadyPulledToday
+                ? ' — you\'ve already run today\'s pull, resets at midnight'
+                : ''}
           </p>
         )}
         <form className="form-row" onSubmit={submit}>
@@ -74,7 +80,7 @@ export default function SdrPullScreen({ regions = [] }) {
               <option value="icp2">ICP2 (51-250 employees)</option>
             </select>
           </label>
-          <button className="btn" type="submit" disabled={isRunning || atQuota}>
+          <button className="btn" type="submit" disabled={isRunning || blocked}>
             {isRunning ? 'Pull running…' : 'Pull leads'}
           </button>
         </form>

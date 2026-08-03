@@ -239,6 +239,34 @@ test('runQuotaPull: respects SESSION_MAX_PULLED when nothing qualifies', async (
   assert.ok(fresh.pulledCount >= 10, 'at least the first batch');
 });
 
+test('runQuotaPull: a single empty round does not give up early when the pool has more left', async () => {
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
+  const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
+  // c10 is what the next 1-item top-up round would reserve — pre-existing, so
+  // that round dedups to 0 saved even though c11+ are still fresh and available.
+  await Company.create({ apolloAccountId: 'c10', companyName: 'Existing dup', listId: list._id, sdrStatus: 'pending' });
+
+  let round = 0;
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    qualify: async (companies) => {
+      const n = round === 0 ? 4 : 1; // round 0 (batch of 10) qualifies 4; any later round qualifies 1
+      // Resolve every company to a definitive verdict — nothing stays 'pending'
+      // after qualification, matching the real qualifier's behavior.
+      for (let i = 0; i < companies.length; i++) {
+        await Company.findByIdAndUpdate(companies[i]._id, { $set: { status: i < n ? 'qualified' : 'disqualified' } });
+      }
+      round++;
+      return new Map();
+    },
+  };
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
+});
+
 test('collectCompanies skips orgs when enrich throws, continues with others', async () => {
   const list = await makeList({ requestedCount: 3 });
   // enrich throws for 'b', succeeds for others
