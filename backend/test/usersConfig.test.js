@@ -29,5 +29,5 @@ test('every SDR has at least one valid region; admin has none', () => {
 
 test('aus roster is correct', () => {
   const aus = sdrs.filter((u) => u.regions.includes('aus')).map((u) => u.email).sort();
-  assert.deepEqual(aus, ['darrent@scytale.ai', 'katiem@scytale.ai', 'simamkelen@scytale.ai']);
+  assert.deepEqual(aus, ['darrent@scytale.ai', 'katiem@scytale.ai', 'simonn@scytale.ai']);
 });

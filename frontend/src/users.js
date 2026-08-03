@@ -1,6 +1,6 @@
 export default [
   { email: 'yonia@scytale.ai',       role: 'admin', regions: [] },
-  { email: 'simamkelen@scytale.ai',  role: 'sdr',   regions: ['aus', 'nordics'] },
+  { email: 'simonn@scytale.ai',      role: 'sdr',   regions: ['aus', 'nordics'] },
   { email: 'darrent@scytale.ai',     role: 'sdr',   regions: ['aus', 'nordics'] },
   { email: 'katiem@scytale.ai',      role: 'sdr',   regions: ['aus', 'benelux'] },
   { email: 'jamesb@scytale.ai',      role: 'sdr',   regions: ['benelux', 'uk'] },
