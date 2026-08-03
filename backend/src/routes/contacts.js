@@ -22,22 +22,24 @@ router.post('/:id/hubspot', async (req, res, next) => {
       return res.status(403).json({ error: 'Not your list' });
     }
 
+    let result;
     try {
-      const result = await hubspotService.pushContact(company, contact, list.assignedTo);
-      contact.hubspotStatus = result.status;
-      contact.hubspotContactId = result.hubspotContactId;
-      if (result.hubspotCompanyId) contact.hubspotCompanyId = result.hubspotCompanyId;
-      contact.hubspotSyncedAt = new Date();
-      contact.hubspotSyncedBy = req.user.email;
-      contact.hubspotError = undefined;
-      await contact.save();
-      return res.json(contact);
+      result = await hubspotService.pushContact(company, contact, list.assignedTo);
     } catch (err) {
       contact.hubspotStatus = 'failed';
       contact.hubspotError = err.message;
       await contact.save();
       return res.status(502).json({ error: err.message });
     }
+
+    contact.hubspotStatus = result.status;
+    contact.hubspotContactId = result.hubspotContactId;
+    if (result.hubspotCompanyId) contact.hubspotCompanyId = result.hubspotCompanyId;
+    contact.hubspotSyncedAt = new Date();
+    contact.hubspotSyncedBy = req.user.email;
+    contact.hubspotError = undefined;
+    await contact.save();
+    return res.json(contact);
   } catch (err) {
     next(err);
   }
