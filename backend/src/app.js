@@ -21,6 +21,7 @@ app.use('/api/pull', require('./routes/pull'));
 app.use('/api/lists', require('./routes/lists'));
 app.use('/api/leads', require('./routes/leads'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/contacts', require('./routes/contacts'));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

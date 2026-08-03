@@ -1,6 +1,9 @@
 require('dotenv').config();
 
-const REQUIRED_ENV = ['MONGODB_URI', 'ANTHROPIC_API_KEY', 'APOLLO_API_KEY', 'APOLLO_PEOPLE_KEY', 'SESSION_SECRET'];
+const REQUIRED_ENV = [
+  'MONGODB_URI', 'ANTHROPIC_API_KEY', 'APOLLO_API_KEY', 'APOLLO_PEOPLE_KEY', 'SESSION_SECRET',
+  'HUBSPOT_CLIENT_ID', 'HUBSPOT_CLIENT_SECRET', 'HUBSPOT_REFRESH_TOKEN',
+];
 const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error(`Missing required environment variables: ${missing.join(', ')}`);

@@ -17,6 +17,14 @@ const contactSchema = new mongoose.Schema(
     rank:           { type: Number }, // 1..4 (1 = best)
     isPrimary:      { type: Boolean, default: false },
     reasoning:      { type: String },
+
+    // ── HubSpot push (manual, per-contact button) ─────────────────────────
+    hubspotStatus:    { type: String, enum: ['none', 'synced', 'already_existed', 'failed'], default: 'none' },
+    hubspotContactId: { type: String },
+    hubspotCompanyId: { type: String },
+    hubspotSyncedAt:  { type: Date },
+    hubspotSyncedBy:  { type: String }, // email of whoever clicked the button
+    hubspotError:     { type: String }, // last failure reason, cleared on next success
   },
   { timestamps: true }
 );
