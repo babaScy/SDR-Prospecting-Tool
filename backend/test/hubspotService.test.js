@@ -153,3 +153,15 @@ test('pushContact rejects when the domain matches more than one HubSpot company'
     (err) => { assert.equal(err.code, 'AMBIGUOUS_COMPANY'); return true; }
   );
 });
+
+test('pushContact rejects when email/LinkedIn matches more than one HubSpot contact', async () => {
+  const request = async (method, path) => {
+    if (path.startsWith('/crm/v3/owners')) return { data: { results: [{ id: 'owner-1' }] } };
+    if (path === '/crm/v3/objects/contacts/search') return { data: { total: 2, results: [] } };
+    throw new Error('should not create anything when ambiguous');
+  };
+  await assert.rejects(
+    () => svc.pushContact({ companyName: 'Acme', website: 'https://acme.com' }, { email: 'jane@acme.com' }, 'davidv@scytale.ai', { request }),
+    (err) => { assert.equal(err.code, 'AMBIGUOUS_CONTACT'); return true; }
+  );
+});
