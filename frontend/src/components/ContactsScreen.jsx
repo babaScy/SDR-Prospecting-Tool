@@ -24,6 +24,7 @@ function ContactCard({ c, onPushed }) {
 
   const synced = c.hubspotStatus === 'synced';
   const alreadyExisted = c.hubspotStatus === 'already_existed';
+  const noIdentity = !c.email && !c.linkedinUrl;
   const label = synced ? 'In HubSpot' : alreadyExisted ? 'Already in HubSpot' : busy ? 'Adding…' : 'Add to HubSpot';
 
   return (
@@ -45,7 +46,7 @@ function ContactCard({ c, onPushed }) {
         {c.phone && <a className="chip" href={`tel:${c.phone}`}><IconPhone width={14} height={14} /> {c.phone}</a>}
       </div>
       <div className="contact-actions">
-        <button className="btn small ghost" onClick={push} disabled={busy || synced || alreadyExisted}>
+        <button className="btn small ghost" onClick={push} disabled={busy || synced || alreadyExisted || noIdentity} title={noIdentity ? 'No email or LinkedIn URL — cannot safely dedupe in HubSpot' : undefined}>
           {synced && <IconCheck width={14} height={14} />} {label}
         </button>
       </div>

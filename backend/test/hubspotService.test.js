@@ -49,6 +49,16 @@ test('getOwnerIdByEmail caches by email (case-insensitive) — second call skips
   assert.equal(calls, 1);
 });
 
+test('getOwnerIdByEmail never caches a negative result — a later call re-checks HubSpot', async () => {
+  let calls = 0;
+  const request = async () => { calls += 1; return { data: { results: [] } }; };
+  const first = await svc.getOwnerIdByEmail('nobody@scytale.ai', { request });
+  const second = await svc.getOwnerIdByEmail('nobody@scytale.ai', { request });
+  assert.equal(first, null);
+  assert.equal(second, null);
+  assert.equal(calls, 2, 'a "not found" result must not be cached, so the SDR can be added to HubSpot later without a restart');
+});
+
 test('findCompanyByDomain: no match, single match, ambiguous', async () => {
   const none = await svc.findCompanyByDomain('acme.com', { request: async () => ({ data: { total: 0, results: [] } }) });
   assert.equal(none, null);

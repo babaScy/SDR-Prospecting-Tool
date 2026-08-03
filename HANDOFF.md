@@ -67,7 +67,7 @@ the UI, so skipping the screen buys nothing.
 pool) used only for people search + bulk match during contact sourcing.
 Company pulls work without it; contact sourcing does not.
 
-Backend tests: `cd backend && npm test` (87/87 passing, in-memory Mongo, no real API calls).
+Backend tests: `cd backend && npm test` (157/157 passing, in-memory Mongo, no real API calls).
 
 ## What's built
 

@@ -29,7 +29,8 @@ async function getAccessToken() {
   return cachedToken;
 }
 
-// Authed request. Retries once on 429/5xx (HubSpot rate limit / transient).
+// Authed request. Retries once on 401 (stale cached token — re-fetch and retry)
+// or on 429/5xx (HubSpot rate limit / transient).
 async function hsRequest(method, path, data) {
   const token = await getAccessToken();
   const cfg = {
@@ -43,12 +44,24 @@ async function hsRequest(method, path, data) {
     return await axios(cfg);
   } catch (err) {
     const status = err.response?.status;
-    if (status === 429 || (status >= 500 && status < 600)) {
-      const wait = parseInt(err.response?.headers?.['retry-after'] || '2', 10) * 1000;
-      await new Promise((r) => setTimeout(r, wait));
-      return axios(cfg);
+    try {
+      if (status === 401) {
+        cachedToken = null; // stale/invalidated — force a fresh token on next getAccessToken()
+        const freshToken = await getAccessToken();
+        return await axios({ ...cfg, headers: { ...cfg.headers, Authorization: `Bearer ${freshToken}` } });
+      }
+      if (status === 429 || (status >= 500 && status < 600)) {
+        const parsed = parseInt(err.response?.headers?.['retry-after'] || '2', 10);
+        const wait = (Number.isFinite(parsed) ? parsed : 2) * 1000;
+        await new Promise((r) => setTimeout(r, wait));
+        return await axios(cfg);
+      }
+    } catch (retryErr) {
+      // Surface HubSpot's own detail (plain string only — never the raw error/config/headers,
+      // which would carry the bearer token via retryErr.config / retryErr.response.config).
+      throw new Error(retryErr.response?.data?.message || retryErr.message);
     }
-    throw err;
+    throw new Error(err.response?.data?.message || err.message);
   }
 }
 
@@ -92,7 +105,7 @@ function linkedinVariants(input) {
 }
 
 // ─── Owner lookup (cached — owners rarely change) ────────────────────────────
-const ownerCache = new Map(); // lowercased email -> HubSpot owner id, or null (checked, not found)
+const ownerCache = new Map(); // lowercased email -> HubSpot owner id (positive results only — see getOwnerIdByEmail)
 
 async function getOwnerIdByEmail(email, deps = {}) {
   const request = deps.request || hsRequest;
@@ -101,7 +114,7 @@ async function getOwnerIdByEmail(email, deps = {}) {
   const res = await request('get', `/crm/v3/owners?email=${encodeURIComponent(key)}`);
   const owner = (res.data.results || [])[0];
   const id = owner ? owner.id : null;
-  ownerCache.set(key, id);
+  if (id) ownerCache.set(key, id); // never cache a negative result — an SDR can be added to HubSpot later
   return id;
 }
 

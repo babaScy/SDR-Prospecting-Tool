@@ -22,10 +22,15 @@ router.post('/:id/hubspot', async (req, res, next) => {
       return res.status(403).json({ error: 'Not your list' });
     }
 
+    if (!contact.email && !contact.linkedinUrl) {
+      return res.status(400).json({ error: 'No email or LinkedIn URL on this contact — cannot safely dedupe in HubSpot' });
+    }
+
     let result;
     try {
       result = await hubspotService.pushContact(company, contact, list.assignedTo);
     } catch (err) {
+      console.error(`[hubspot] push failed for contact ${contact._id}: ${err.message}`);
       contact.hubspotStatus = 'failed';
       contact.hubspotError = err.message;
       await contact.save();

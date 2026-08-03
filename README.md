@@ -27,9 +27,10 @@ Open http://localhost:5174
 ## Environment
 
 `backend/.env` needs `MONGODB_URI`, `APOLLO_API_KEY`, `ANTHROPIC_API_KEY`,
-`APOLLO_PEOPLE_KEY` (same values as `The-Wolf/.env`). Data lives in the
-`PROSPECTOR` database on the shared Atlas cluster — the `WOLF+` database is
-never touched.
+`APOLLO_PEOPLE_KEY` (same values as `The-Wolf/.env`), plus `HUBSPOT_CLIENT_ID`,
+`HUBSPOT_CLIENT_SECRET`, `HUBSPOT_REFRESH_TOKEN` (HubSpot OAuth app + refresh
+token for the connected HubSpot account). Data lives in the `PROSPECTOR`
+database on the shared Atlas cluster — the `WOLF+` database is never touched.
 
 `APOLLO_PEOPLE_KEY` is a **separate Apollo credential** from `APOLLO_API_KEY`
 (different account/credit pool) and is only used by contact sourcing — company

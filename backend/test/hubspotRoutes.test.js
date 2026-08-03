@@ -16,6 +16,7 @@ beforeEach(async () => { await db.clear(); });
 
 const asDavid = (req) => req.set('Cookie', sessionCookie('davidv@scytale.ai'));
 const asKhadym = (req) => req.set('Cookie', sessionCookie('khadym@scytale.ai'));
+const asAdmin = (req) => req.set('Cookie', sessionCookie('yonia@scytale.ai'));
 
 const makeSetup = async () => {
   const list = await List.create({
@@ -42,6 +43,30 @@ test('403 for a non-owning SDR', async () => {
   const { contact } = await makeSetup();
   const res = await asKhadym(request(app).post(`/api/contacts/${contact._id}/hubspot`));
   assert.equal(res.status, 403);
+});
+
+test('admin is not blocked by the SDR ownership check', async () => {
+  const { contact } = await makeSetup(); // list is assigned to davidv@scytale.ai, not the admin
+  hubspotService.pushContact = async () => ({ status: 'synced', hubspotContactId: 'hc-admin', hubspotCompanyId: 'co-admin' });
+  const res = await asAdmin(request(app).post(`/api/contacts/${contact._id}/hubspot`));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.hubspotStatus, 'synced');
+  assert.equal(res.body.hubspotContactId, 'hc-admin');
+});
+
+test('400 when the contact has neither email nor LinkedIn — no push attempted', async () => {
+  const { contact } = await makeSetup();
+  contact.email = undefined;
+  contact.linkedinUrl = undefined;
+  await contact.save();
+  let pushCalled = false;
+  hubspotService.pushContact = async () => { pushCalled = true; return { status: 'synced', hubspotContactId: 'x', hubspotCompanyId: 'y' }; };
+  const res = await asDavid(request(app).post(`/api/contacts/${contact._id}/hubspot`));
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /No email or LinkedIn URL/);
+  assert.equal(pushCalled, false);
+  const saved = await Contact.findById(contact._id);
+  assert.equal(saved.hubspotStatus, 'none');
 });
 
 test('successful push persists synced status and IDs', async () => {
