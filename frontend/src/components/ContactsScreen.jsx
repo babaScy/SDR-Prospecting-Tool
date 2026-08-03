@@ -49,7 +49,7 @@ function ContactCard({ c, onPushed }) {
           {synced && <IconCheck width={14} height={14} />} {label}
         </button>
       </div>
-      {err && <div className="error">{err}</div>}
+      {(err || c.hubspotError) && <div className="error">{err || c.hubspotError}</div>}
     </div>
   );
 }
