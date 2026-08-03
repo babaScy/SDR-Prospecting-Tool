@@ -111,13 +111,138 @@ function clearCaches() {
   ownerCache.clear();
 }
 
+// ─── Property mapping ────────────────────────────────────────────────────────
+const prune = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v != null && v !== ''));
+
+const resolveDomain = (company, contact) => normalizeDomain(contact?.domain || company?.website);
+
+const companyProps = (company, domain, ownerId) => prune({
+  name: company.companyName,
+  domain,
+  country: company.country,
+  numberofemployees: company.employees,
+  linkedin_company_page: normalizeLinkedIn(company.companyLinkedinUrl),
+  hubspot_owner_id: ownerId,
+  inbound_outbound: 'OUTBOUND',
+  lifecyclestage: '209865412', // "Outbound Qualified Lead"
+});
+
+const contactProps = (contact, ownerId) => prune({
+  firstname: contact.firstName,
+  lastname: contact.lastName,
+  email: normalizeEmail(contact.email),
+  jobtitle: contact.title,
+  linkedin_profile: normalizeLinkedIn(contact.linkedinUrl),
+  hs_marketable_status: false,
+  hubspot_owner_id: ownerId,
+  hs_lead_status: 'NEW',
+  lead_source: 'Outbound',
+  mql_sql: 'SQL',
+});
+
+// ─── Dedup lookups (read-only) ────────────────────────────────────────────────
+async function findCompanyByDomain(domain, deps = {}) {
+  const request = deps.request || hsRequest;
+  const d = normalizeDomain(domain);
+  if (!d) return null;
+  const res = await request('post', '/crm/v3/objects/companies/search', {
+    filterGroups: [{ filters: [{ propertyName: 'domain', operator: 'EQ', value: d }] }],
+    properties: ['domain', 'name'],
+    limit: 2,
+  });
+  const total = res.data.total || 0;
+  if (total === 0) return null;
+  if (total > 1) return { ambiguous: true, count: total };
+  return { id: res.data.results[0].id };
+}
+
+async function findContactByEmailOrLinkedIn(email, linkedinUrl, deps = {}) {
+  const request = deps.request || hsRequest;
+  const e = normalizeEmail(email);
+  const liVariants = linkedinVariants(linkedinUrl);
+  const filterGroups = [];
+  if (e) filterGroups.push({ filters: [{ propertyName: 'email', operator: 'EQ', value: e }] });
+  if (liVariants.length) filterGroups.push({ filters: [{ propertyName: 'linkedin_profile', operator: 'IN', values: liVariants }] });
+  if (!filterGroups.length) return null;
+  const res = await request('post', '/crm/v3/objects/contacts/search', {
+    filterGroups,
+    properties: ['email', 'linkedin_profile'],
+    limit: 2,
+  });
+  const total = res.data.total || 0;
+  if (total === 0) return null;
+  if (total > 1) return { ambiguous: true, count: total };
+  const hit = res.data.results[0];
+  const matchedOn = e && hit.properties?.email?.toLowerCase() === e ? 'email' : 'linkedin';
+  return { id: hit.id, matchedOn };
+}
+
+// ─── Orchestrator: dedup gate + insert-only write for ONE contact ────────────
+class HubspotPushError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
+}
+
+async function pushContact(company, contact, ownerEmail, deps = {}) {
+  const request = deps.request || hsRequest;
+
+  const ownerId = await getOwnerIdByEmail(ownerEmail, { request });
+  if (!ownerId) {
+    throw new HubspotPushError(
+      'NO_HUBSPOT_OWNER',
+      `No HubSpot user found for ${ownerEmail} — ask an admin to check their HubSpot account email.`
+    );
+  }
+
+  const existingContact = await findContactByEmailOrLinkedIn(contact.email, contact.linkedinUrl, { request });
+  if (existingContact?.ambiguous) {
+    throw new HubspotPushError(
+      'AMBIGUOUS_CONTACT',
+      `${existingContact.count} HubSpot contacts already match this email/LinkedIn — resolve manually.`
+    );
+  }
+  if (existingContact) {
+    return { status: 'already_existed', hubspotContactId: existingContact.id, hubspotCompanyId: null };
+  }
+
+  const domain = resolveDomain(company, contact);
+  const companyHit = domain ? await findCompanyByDomain(domain, { request }) : null;
+  if (companyHit?.ambiguous) {
+    throw new HubspotPushError(
+      'AMBIGUOUS_COMPANY',
+      `${companyHit.count} HubSpot companies already match domain ${domain} — resolve manually.`
+    );
+  }
+
+  let companyId = companyHit?.id;
+  if (!companyId) {
+    const created = await request('post', '/crm/v3/objects/companies', { properties: companyProps(company, domain, ownerId) });
+    companyId = created.data.id;
+  }
+
+  const createdContact = await request('post', '/crm/v3/objects/contacts', { properties: contactProps(contact, ownerId) });
+  const contactId = createdContact.data.id;
+
+  await request('put', `/crm/v4/objects/contacts/${contactId}/associations/default/companies/${companyId}`);
+
+  return { status: 'synced', hubspotContactId: contactId, hubspotCompanyId: companyId };
+}
+
 module.exports = {
   normalizeDomain,
   normalizeEmail,
   normalizeLinkedIn,
   linkedinVariants,
   getOwnerIdByEmail,
+  findCompanyByDomain,
+  findContactByEmailOrLinkedIn,
+  companyProps,
+  contactProps,
+  resolveDomain,
+  pushContact,
+  HubspotPushError,
   clearCaches,
-  // internal, exposed only so Task 2 extends the same module cleanly:
   hsRequest,
 };
