@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { startPull, fetchLists, fetchList, fetchQualificationMode, setQualificationMode as saveQualificationMode } from '../api';
 import USERS from '../users';
 
-const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus'];
+const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland'];
 const RUNNING = ['pulling', 'qualifying'];
 const SDRS = USERS.filter((u) => u.role === 'sdr');
 

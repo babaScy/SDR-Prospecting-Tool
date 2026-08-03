@@ -5,9 +5,9 @@ const { REGIONS } = require('../src/config/filters');
 
 const sdrs = USERS.filter((u) => u.role === 'sdr');
 
-test('roster has one admin and 13 SDRs', () => {
+test('roster has one admin and 14 SDRs', () => {
   assert.equal(USERS.filter((u) => u.role === 'admin').length, 1);
-  assert.equal(sdrs.length, 13);
+  assert.equal(sdrs.length, 14);
 });
 
 test('danielp was dropped', () => {

@@ -30,7 +30,7 @@ export default function ListTable({ listId, onDecision }) {
   const [verdictFilter, setVerdictFilter] = useState('all');
   const [sdrFilter, setSdrFilter] = useState('all');
   const [sort, setSort] = useState({ key: null, dir: 1 });
-  const [busyId, setBusyId] = useState(null);
+  const [busyIds, setBusyIds] = useState(() => new Set());
 
   useEffect(() => {
     fetchLeads(listId)
@@ -55,7 +55,7 @@ export default function ListTable({ listId, onDecision }) {
   };
 
   const decide = async (lead, decision) => {
-    setBusyId(lead._id);
+    setBusyIds((prev) => new Set(prev).add(lead._id));
     setError('');
     try {
       const updated = await sendDecision(lead._id, decision);
@@ -66,7 +66,11 @@ export default function ListTable({ listId, onDecision }) {
     } catch (err) {
       setError(err.message);
     } finally {
-      setBusyId(null);
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(lead._id);
+        return next;
+      });
     }
   };
 
@@ -127,15 +131,15 @@ export default function ListTable({ listId, onDecision }) {
                 <td>
                   {lead.sdrStatus === 'pending' ? (
                     <div className="decision-row" style={{ margin: 0 }}>
-                      <button className="btn accept small" onClick={() => decide(lead, 'accepted')} disabled={busyId === lead._id}>
+                      <button className="btn accept small" onClick={() => decide(lead, 'accepted')} disabled={busyIds.has(lead._id)}>
                         <IconCheck /> Accept
                       </button>
-                      <button className="btn reject small" onClick={() => decide(lead, 'rejected')} disabled={busyId === lead._id}>
+                      <button className="btn reject small" onClick={() => decide(lead, 'rejected')} disabled={busyIds.has(lead._id)}>
                         <IconX /> Reject
                       </button>
                     </div>
                   ) : (
-                    <button className="btn ghost small" onClick={() => decide(lead, 'pending')} disabled={busyId === lead._id}>
+                    <button className="btn ghost small" onClick={() => decide(lead, 'pending')} disabled={busyIds.has(lead._id)}>
                       <IconUndo /> Undo
                     </button>
                   )}

@@ -5,6 +5,7 @@ const REGIONS = {
   nordics: ['Norway', 'Finland', 'Denmark', 'Sweden'],
   dach:    ['Germany', 'Switzerland', 'Austria'],
   aus:     ['Australia'],
+  poland:  ['Poland'],
 };
 
 const COMMON_FILTERS = {
