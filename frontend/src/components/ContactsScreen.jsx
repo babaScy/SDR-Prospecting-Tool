@@ -1,12 +1,31 @@
 import { useEffect, useState } from 'react';
-import { fetchContacts, fetchList } from '../api';
-import { IconMail, IconLinkedin, IconPhone, IconStar } from '../icons';
+import { fetchContacts, fetchList, pushContactToHubspot } from '../api';
+import { IconMail, IconLinkedin, IconPhone, IconStar, IconCheck } from '../icons';
 import { getCompanyHref } from '../utils/companyLink';
 
 const RUNNING = ['sourcing'];
 const initials = (c) => `${(c.firstName || '?')[0] || ''}${(c.lastName || '')[0] || ''}`.toUpperCase() || '?';
 
-function ContactCard({ c }) {
+function ContactCard({ c, onPushed }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const push = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      onPushed(await pushContactToHubspot(c._id));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const synced = c.hubspotStatus === 'synced';
+  const alreadyExisted = c.hubspotStatus === 'already_existed';
+  const label = synced ? 'In HubSpot' : alreadyExisted ? 'Already in HubSpot' : busy ? 'Adding…' : 'Add to HubSpot';
+
   return (
     <div className={`contact-card${c.isPrimary ? ' primary' : ''}`}>
       {c.isPrimary && <span className="primary-ribbon"><IconStar width={12} height={12} /> Primary</span>}
@@ -25,6 +44,12 @@ function ContactCard({ c }) {
         {c.linkedinUrl && <a className="chip" href={c.linkedinUrl} target="_blank" rel="noreferrer"><IconLinkedin width={14} height={14} /> LinkedIn</a>}
         {c.phone && <a className="chip" href={`tel:${c.phone}`}><IconPhone width={14} height={14} /> {c.phone}</a>}
       </div>
+      <div className="contact-actions">
+        <button className="btn small ghost" onClick={push} disabled={busy || synced || alreadyExisted}>
+          {synced && <IconCheck width={14} height={14} />} {label}
+        </button>
+      </div>
+      {err && <div className="error">{err}</div>}
     </div>
   );
 }
@@ -83,7 +108,16 @@ export default function ContactsScreen({ listId }) {
             <span className={`badge ${company.contactStatus}`}>{company.contactStatus}</span>
           </div>
           {contacts.length
-            ? <div className="contacts-row">{contacts.map((c) => <ContactCard key={c._id} c={c} />)}</div>
+            ? <div className="contacts-row">{contacts.map((c) => (
+                <ContactCard
+                  key={c._id}
+                  c={c}
+                  onPushed={(updated) => setGroups((prev) => prev.map((g) => ({
+                    ...g,
+                    contacts: g.contacts.map((existing) => (existing._id === updated._id ? updated : existing)),
+                  })))}
+                />
+              ))}</div>
             : <p className="muted">No decision-maker found.</p>}
         </div>
         );

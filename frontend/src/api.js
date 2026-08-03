@@ -60,3 +60,6 @@ export const fetchContacts = (id) => request(`/api/lists/${id}/contacts`);
 
 export const sendDecision = (leadId, decision) =>
   request(`/api/leads/${leadId}/decision`, { method: 'POST', body: JSON.stringify({ decision }) });
+
+export const pushContactToHubspot = (contactId) =>
+  request(`/api/contacts/${contactId}/hubspot`, { method: 'POST' });

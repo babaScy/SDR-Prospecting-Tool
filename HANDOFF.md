@@ -29,6 +29,9 @@ cd frontend && npm install && npm run dev  # port 5174
 MONGODB_URI=<same value as The-Wolf/.env>
 APOLLO_API_KEY=<same value as The-Wolf/.env>
 APOLLO_PEOPLE_KEY=<same value as The-Wolf/.env — a DIFFERENT key to APOLLO_API_KEY>
+HUBSPOT_CLIENT_ID=<HubSpot app client id>
+HUBSPOT_CLIENT_SECRET=<HubSpot app client secret>
+HUBSPOT_REFRESH_TOKEN=<OAuth refresh token for the connected HubSpot account>
 ANTHROPIC_API_KEY=<same value as The-Wolf/.env>
 SESSION_SECRET=<any long random string; rotating it signs everyone out>
 PORT=4000
@@ -73,6 +76,7 @@ Backend tests: `cd backend && npm test` (87/87 passing, in-memory Mongo, no real
 - **Review**: SDR works a list bucket-by-bucket (qualified → nei → disqualified), sees company + domain + qualification reasoning + signals, hits Accept/Reject. Their decision (`sdrStatus`) is final and overrides the AI verdict. `POST /api/leads/:id/decision`.
 - **Confirm review**: `POST /api/lists/:id/confirm-review` (owner-checked, list must be `reviewed`). Sets `reviewConfirmedAt`, which **locks every decision on that list** — `POST /api/leads/:id/decision` returns 409 from then on. If any company is accepted the list goes to `sourcing` and the sourcing job fires (fire-and-forget); with zero accepted it goes straight to `sourced`.
 - **Contact sourcing**: `contactService.sourceList(listId)` walks the accepted companies: `apolloPeopleService.searchCandidates(domain)` (46 broad titles, `include_similar_titles`) → `bulkMatch` in batches of 10 for emails/phones → `pickContacts` (Claude `claude-haiku-4-5`, `select_contacts` tool) picks up to 4 ranked best-first, rank 1 flagged `isPrimary`. Titles matching `EXCLUDED_TITLES` (finance/legal/marketing/sales/HR/…) are filtered out before the model sees them. Contacts are delete-then-insert per company so re-sourcing is clean. `Company.contactStatus` ends `found` or `none` (`none` = no domain, no search hits, or no viable decision maker — a normal outcome). `GET /api/lists/:id/contacts` returns `[{ company, contacts[] }]` sorted by rank. Config is verbatim from WOLF+ `icp-qualifier/src/services/contactService.js`, adapted from 1 contact to up-to-4.
+- **HubSpot push**: `POST /api/contacts/:id/hubspot` pushes one sourced contact (and its company, if not already there) into HubSpot under the owning SDR (owner resolved live via HubSpot's Owners API by email — fails loudly if no match, no fallback owner). Dedup by domain (company) and email/LinkedIn (contact) is checked first; an existing match is reused/reported rather than duplicated. Insert-only, no updates/deletes, no outreach-sequence enrollment (Prospector generates no outreach copy). Button lives on each contact card in the Contacts screen; state (`hubspotStatus`) persists across refresh.
 - **Frontend**: four screens — Pull, Lists (dashboard, polls every 5s), Review (bucket queue with undo, ending in a confirm gate), Contacts (stat strip + one card per accepted company with its ranked contact mini-cards; polls every 3s while sourcing).
 
 Verified end-to-end with a real 5-lead pull against live Apollo/Claude/Atlas — all three screens screenshotted and working, console clean.
@@ -90,10 +94,10 @@ Verified end-to-end with a real 5-lead pull against live Apollo/Claude/Atlas —
 - **Contact sourcing has never made a live Apollo people call.** Every test injects a fake `post`, so the endpoint URLs (`mixed_people/api_search`, `people/bulk_match`), the `X-Api-Key` header shape, and the `data.people` / `data.matches` response shapes are all inherited from WOLF+ and unverified here. First real run is the test.
 - The `cache_control` markers on the picker's system prompt and tool are effectively no-ops: Haiku 4.5 needs a ~4096-token cacheable prefix and the picker prompt is far shorter, so the cache never populates (silent, no error).
 - The Contacts view has no frontend test coverage (the repo has no frontend test suite) — verified by build only, not exercised in a browser.
+- **HubSpot push has never made a live HubSpot call.** Every test injects a fake `request`, so the OAuth token exchange, owner-lookup endpoint, and object create/search endpoints are all unverified against the real API. First real run is the test, same posture contact sourcing shipped with for Apollo people search.
 
 None of these block using the app — they're small, scoped cleanups for whenever this area gets touched next.
 
 ## Next likely asks
 
-- HubSpot push for `sdrStatus: 'accepted'` companies and their sourced contacts (WOLF+'s `The-Wolf/services/hubspotService.js` has the dedup/insert pattern to reuse)
 - Deploying it somewhere the SDR can reach without your machine running
