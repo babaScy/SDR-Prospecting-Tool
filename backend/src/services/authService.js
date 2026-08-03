@@ -44,13 +44,21 @@ function userFromSession(token) {
   }
 }
 
-const cookieOptions = () => ({
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
-  maxAge: SESSION_TTL_SECONDS * 1000,
-  path: '/',
-});
+// Frontend and backend share a domain locally (both on `localhost`), where
+// Lax is correct and Secure would block plain-http dev traffic. In
+// production they're on different domains (Vercel/Render), so the cookie
+// must be sendable cross-site — that requires SameSite=None, which browsers
+// only honor when Secure is also set.
+const cookieOptions = () => {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+    maxAge: SESSION_TTL_SECONDS * 1000,
+    path: '/',
+  };
+};
 
 module.exports = {
   SESSION_COOKIE,
