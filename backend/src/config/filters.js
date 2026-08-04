@@ -6,7 +6,7 @@ const REGIONS = {
   dach:    ['Germany', 'Switzerland', 'Austria'],
   aus:     ['Australia'],
   poland:  ['Poland'],
-  taiwan:  ['Taiwan'],
+  taiwan:  ['Taiwan','Singapore','South Korea'],
 };
 
 const COMMON_FILTERS = {
