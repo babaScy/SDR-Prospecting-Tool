@@ -5,9 +5,9 @@ const { REGIONS } = require('../src/config/filters');
 
 const sdrs = USERS.filter((u) => u.role === 'sdr');
 
-test('roster has one admin and 14 SDRs', () => {
+test('roster has one admin and 16 SDRs', () => {
   assert.equal(USERS.filter((u) => u.role === 'admin').length, 1);
-  assert.equal(sdrs.length, 14);
+  assert.equal(sdrs.length, 16);
 });
 
 test('danielp was dropped', () => {
@@ -29,5 +29,10 @@ test('every SDR has at least one valid region; admin has none', () => {
 
 test('aus roster is correct', () => {
   const aus = sdrs.filter((u) => u.regions.includes('aus')).map((u) => u.email).sort();
-  assert.deepEqual(aus, ['darrent@scytale.ai', 'katiem@scytale.ai', 'simonn@scytale.ai']);
+  assert.deepEqual(aus, ['darrent@scytale.ai', 'katiem@scytale.ai', 'simonn@scytale.ai', 'veronicat@scytale.ai']);
+});
+
+test('taiwan roster is correct', () => {
+  const taiwan = sdrs.filter((u) => u.regions.includes('taiwan')).map((u) => u.email).sort();
+  assert.deepEqual(taiwan, ['darrent@scytale.ai', 'katiem@scytale.ai', 'simonn@scytale.ai', 'veronicat@scytale.ai']);
 });

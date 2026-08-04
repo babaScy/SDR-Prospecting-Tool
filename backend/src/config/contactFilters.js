@@ -32,6 +32,7 @@ const BROAD_SEARCH_TITLES = [
 const PROFILE_CONTEXT = {
   icp1: 'Startup (1–50 employees). No dedicated security function exists yet — compliance is owned by a founder or senior technical leader. Priority order: CEO → CTO / Chief Technology Officer → Co-Founder. CISO is rare at this size but a strong signal if present.',
   icp2: 'Growth-stage company (51–250 employees). Priority order: CTO / Chief Technology Officer → CISO / Head of Security / Head of Infosec / Director of Security → Co-Founder → CEO → VP Engineering / Director of Engineering. At this size the CTO is the dominant decision-maker for compliance tooling, with CISO as the warmest lead if present.',
+  icp3: 'Enterprise (250+ employees). Priority order: CISO / Head of Security / Head of Infosec → Director of Security / Director of Information Security → CTO / Chief Technology Officer → VP Security / VP Engineering. At this size compliance is owned by a dedicated security function, with the CISO the primary decision-maker for compliance tooling.',
 };
 
 // Adapted from WOLF+: pick UP TO 4 ranked contacts instead of one.

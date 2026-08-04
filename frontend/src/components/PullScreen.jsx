@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { startPull, fetchLists, fetchList, fetchQualificationMode, setQualificationMode as saveQualificationMode } from '../api';
 import USERS from '../users';
 
-const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland'];
+const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan'];
 const RUNNING = ['pulling', 'qualifying'];
 const SDRS = USERS.filter((u) => u.role === 'sdr');
 
@@ -105,6 +105,7 @@ export default function PullScreen() {
             <select value={profile} onChange={(e) => setProfile(e.target.value)}>
               <option value="icp1">ICP1 (1-50 employees)</option>
               <option value="icp2">ICP2 (51-250 employees)</option>
+              <option value="icp3">ICP3 (250+ employees)</option>
             </select>
           </label>
           <label>

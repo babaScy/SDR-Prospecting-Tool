@@ -6,6 +6,7 @@ const REGIONS = {
   dach:    ['Germany', 'Switzerland', 'Austria'],
   aus:     ['Australia'],
   poland:  ['Poland'],
+  taiwan:  ['Taiwan'],
 };
 
 const COMMON_FILTERS = {
@@ -82,4 +83,9 @@ const ICP2_FILTERS = {
   organization_num_employees_ranges: ['51,100', '101,200', '201,250'],
 };
 
-module.exports = { ICP1_FILTERS, ICP2_FILTERS, REGIONS };
+const ICP3_FILTERS = {
+  ...COMMON_FILTERS,
+  organization_num_employees_ranges: ['251,500', '501,1000', '1001,5000', '5001,10000', '10001,'],
+};
+
+module.exports = { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS };

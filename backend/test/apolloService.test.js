@@ -18,6 +18,12 @@ test('buildSearchBody uses icp2 employee ranges', () => {
   assert.deepEqual(body.organization_locations, ['United States']);
 });
 
+test('buildSearchBody uses icp3 employee ranges', () => {
+  const body = buildSearchBody('icp3', 'taiwan', 1, 25);
+  assert.deepEqual(body.organization_num_employees_ranges, ['251,500', '501,1000', '1001,5000', '5001,10000', '10001,']);
+  assert.deepEqual(body.organization_locations, ['Taiwan']);
+});
+
 test('buildSearchBody throws on unknown profile or region', () => {
   assert.throws(() => buildSearchBody('icp9', 'uk', 1, 25), /Unknown profile/);
   assert.throws(() => buildSearchBody('icp1', 'mars', 1, 25), /Unknown region/);

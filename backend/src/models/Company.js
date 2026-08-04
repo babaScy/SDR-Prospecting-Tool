@@ -40,7 +40,7 @@ const companySchema = new mongoose.Schema(
     latestFundingDate: { type: Date },
     companyLinkedinUrl: { type: String },
 
-    icpProfile: { type: String, enum: ['icp1', 'icp2'] },
+    icpProfile: { type: String, enum: ['icp1', 'icp2', 'icp3'] },
 
     // ── AI verdict ───────────────────────────────────────────────────────────
     status: {

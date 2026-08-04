@@ -5,10 +5,10 @@ const mongoose = require('mongoose');
 const listSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    profile: { type: String, enum: ['icp1', 'icp2'], required: true },
+    profile: { type: String, enum: ['icp1', 'icp2', 'icp3'], required: true },
     region: {
       type: String,
-      enum: ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland'],
+      enum: ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan'],
       required: true,
     },
     requestedCount: { type: Number, required: true },

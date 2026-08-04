@@ -78,6 +78,7 @@ export default function SdrPullScreen({ regions = [] }) {
             <select value={profile} onChange={(e) => setProfile(e.target.value)}>
               <option value="icp1">ICP1 (1-50 employees)</option>
               <option value="icp2">ICP2 (51-250 employees)</option>
+              <option value="icp3">ICP3 (250+ employees)</option>
             </select>
           </label>
           <button className="btn" type="submit" disabled={isRunning || blocked}>

@@ -43,8 +43,8 @@ async function sdrPull(req, res, next) {
   if (!req.user.regions?.includes(region)) {
     return res.status(403).json({ error: 'Not one of your regions' });
   }
-  if (!['icp1', 'icp2'].includes(profile)) {
-    return res.status(400).json({ error: "profile must be 'icp1' or 'icp2'" });
+  if (!['icp1', 'icp2', 'icp3'].includes(profile)) {
+    return res.status(400).json({ error: "profile must be 'icp1', 'icp2', or 'icp3'" });
   }
   if (await quotaService.pulledToday(req.user.email)) {
     return res.status(429).json({ error: 'You can only start one pull per day — resets at midnight' });
@@ -82,8 +82,8 @@ async function adminPull(req, res, next) {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Only an admin can run a pull' });
 
   const { profile, region, count, assignedTo } = req.body || {};
-  if (!['icp1', 'icp2'].includes(profile)) {
-    return res.status(400).json({ error: "profile must be 'icp1' or 'icp2'" });
+  if (!['icp1', 'icp2', 'icp3'].includes(profile)) {
+    return res.status(400).json({ error: "profile must be 'icp1', 'icp2', or 'icp3'" });
   }
   if (!REGIONS[region]) {
     return res.status(400).json({ error: `region must be one of: ${Object.keys(REGIONS).join(', ')}` });

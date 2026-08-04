@@ -1,8 +1,8 @@
 module.exports = [
   { email: 'yonia@scytale.ai',       role: 'admin', regions: [] },
-  { email: 'simonn@scytale.ai',      role: 'sdr',   regions: ['aus', 'nordics'] },
-  { email: 'darrent@scytale.ai',     role: 'sdr',   regions: ['aus', 'nordics'] },
-  { email: 'katiem@scytale.ai',      role: 'sdr',   regions: ['aus', 'benelux'] },
+  { email: 'simonn@scytale.ai',      role: 'sdr',   regions: ['aus', 'nordics', 'taiwan'] },
+  { email: 'darrent@scytale.ai',     role: 'sdr',   regions: ['aus', 'nordics', 'taiwan'] },
+  { email: 'katiem@scytale.ai',      role: 'sdr',   regions: ['aus', 'benelux', 'taiwan'] },
   { email: 'jamesb@scytale.ai',      role: 'sdr',   regions: ['benelux', 'uk'] },
   { email: 'chumam@scytale.ai',      role: 'sdr',   regions: ['benelux', 'dach'] },
   { email: 'tylorvw@scytale.ai',     role: 'sdr',   regions: ['benelux', 'uk'] },
@@ -14,4 +14,6 @@ module.exports = [
   { email: 'lusandam@scytale.ai',    role: 'sdr',   regions: ['uk'] },
   { email: 'kristophers@scytale.ai', role: 'sdr',   regions: ['uk'] },
   { email: 'aleksandra@scytale.ai',  role: 'sdr',   regions: ['poland', 'uk'] },
+  { email: 'severop@scytale.ai',     role: 'sdr',   regions: ['dach', 'nordics'] },
+  { email: 'veronicat@scytale.ai',   role: 'sdr',   regions: ['aus', 'benelux', 'taiwan'] },
 ];

@@ -1,7 +1,7 @@
 const axios = require('axios');
-const { ICP1_FILTERS, ICP2_FILTERS, REGIONS } = require('../config/filters');
+const { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS } = require('../config/filters');
 
-const PROFILE_FILTERS = { icp1: ICP1_FILTERS, icp2: ICP2_FILTERS };
+const PROFILE_FILTERS = { icp1: ICP1_FILTERS, icp2: ICP2_FILTERS, icp3: ICP3_FILTERS };
 
 const APOLLO_SEARCH_URL = 'https://api.apollo.io/api/v1/mixed_companies/search';
 const APOLLO_ENRICH_URL = 'https://api.apollo.io/api/v1/organizations';

@@ -82,6 +82,12 @@ test('an admin-assigned (fixed) pull today does not block the SDR\'s own self-se
   assert.equal(res.status, 201);
 });
 
+test('POST /api/pull accepts icp3 profile and taiwan region', async () => {
+  const res = await admin(request(app).post('/api/pull')).send({ profile: 'icp3', region: 'taiwan', count: 10, assignedTo: 'davidv@scytale.ai' });
+  assert.equal(res.status, 201);
+  assert.match(res.body.name, /TAIWAN · ICP3 · /);
+});
+
 test('GET /api/pull/quota returns the SDR count', async () => {
   const res = await asSdr(request(app).get('/api/pull/quota'));
   assert.equal(res.status, 200);
