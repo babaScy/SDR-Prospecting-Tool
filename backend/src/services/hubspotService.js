@@ -143,15 +143,19 @@ const companyProps = (company, domain, ownerId) => prune({
   lifecyclestage: '209865412', // "Outbound Qualified Lead"
 });
 
-// `company` and `number_of_employees_contact` are the contact's own copies of
-// its company's name/size — independent of whatever's on the associated
-// company record — and `country` has no HubSpot-side automation to fill it in
-// at all. Without setting these here explicitly, they sit blank on every
-// contact we push unless HubSpot's own domain-matching automation happens to
-// fill `company` in (it never touches `country` or company size).
-// Note: `numemployees` is a bucketed enum meant for the Company object, and
-// `company_size` is wired to the Facebook Lead Ads integration — neither is
-// the right target here.
+// `company` is the contact's own "Company Name" field — independent of the
+// name on its associated company record — and `country` has no HubSpot-side
+// automation to fill it in at all. Without setting them here explicitly, both
+// sit blank on every contact we push unless HubSpot's own domain-matching
+// automation happens to fill `company` in (it never touches `country`).
+//
+// Company size is deliberately NOT set here: `number_of_employees_contact`
+// looked like the right target (a plain numeric custom property) but HubSpot
+// rejects writes to it with READ_ONLY_VALUE — it's a calculated property,
+// presumably a rollup from the associated company, so it should populate on
+// its own once the contact is associated to a company that has
+// numberofemployees set. `numemployees` (bucketed enum, meant for Company) and
+// `company_size` (wired to the Facebook Lead Ads integration) aren't right either.
 const contactProps = (contact, ownerId, company) => prune({
   firstname: contact.firstName,
   lastname: contact.lastName,
@@ -160,7 +164,6 @@ const contactProps = (contact, ownerId, company) => prune({
   linkedin_profile: normalizeLinkedIn(contact.linkedinUrl),
   company: company?.companyName,
   country: company?.country,
-  number_of_employees_contact: company?.employees,
   hs_marketable_status: false,
   hubspot_owner_id: ownerId,
   hs_lead_status: 'NEW',

@@ -132,7 +132,7 @@ test('pushContact returns already_existed without touching the company', async (
   assert.equal(companyCallMade, false);
 });
 
-test('contactProps carries the contact\'s own company name, country, and employee count, independent of the associated company record', () => {
+test('contactProps carries the contact\'s own company name and country, independent of the associated company record', () => {
   const props = svc.contactProps(
     { firstName: 'Jane', lastName: 'Doe', email: 'jane@acme.com', title: 'CTO' },
     'owner-1',
@@ -140,13 +140,24 @@ test('contactProps carries the contact\'s own company name, country, and employe
   );
   assert.equal(props.company, 'Acme');
   assert.equal(props.country, 'Germany');
-  assert.equal(props.number_of_employees_contact, 50);
 });
 
-test('contactProps omits company/country/employee-count when there is no associated company to read them from', () => {
+test('contactProps omits company/country when there is no associated company to read them from', () => {
   const props = svc.contactProps({ firstName: 'Jane', email: 'jane@acme.com' }, 'owner-1');
   assert.equal('company' in props, false);
   assert.equal('country' in props, false);
+});
+
+// Regression test: HubSpot rejects writes to number_of_employees_contact with
+// READ_ONLY_VALUE — it's a calculated property, not the plain numeric field it
+// appeared to be. This must never be sent, or every push to a contact whose
+// company has an employee count set fails outright.
+test('contactProps never sends number_of_employees_contact — HubSpot rejects it as a calculated/read-only property', () => {
+  const props = svc.contactProps(
+    { firstName: 'Jane', email: 'jane@acme.com' },
+    'owner-1',
+    { companyName: 'Acme', employees: 50 }
+  );
   assert.equal('number_of_employees_contact' in props, false);
 });
 
@@ -173,7 +184,7 @@ test('pushContact creates company + contact + association when nothing matches',
   assert.ok(calls.some((p) => p.includes('/associations/default/companies/co-new')));
   assert.equal(contactPayload.company, 'Acme', 'the contact itself must carry the company name, not just the association');
   assert.equal(contactPayload.country, 'DE', 'the contact itself must carry the country, not just the association');
-  assert.equal(contactPayload.number_of_employees_contact, 50, 'the contact itself must carry the employee count too');
+  assert.equal('number_of_employees_contact' in contactPayload, false, 'HubSpot rejects writes to this calculated property');
 });
 
 test('pushContact creates a fresh company every time when there is no domain to dedupe on (no lock involved)', async () => {
