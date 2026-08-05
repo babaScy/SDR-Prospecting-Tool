@@ -143,12 +143,19 @@ const companyProps = (company, domain, ownerId) => prune({
   lifecyclestage: '209865412', // "Outbound Qualified Lead"
 });
 
-const contactProps = (contact, ownerId) => prune({
+// `company` here is the contact's own "Company Name" field — independent of the
+// name on its associated company record — and `country` has no HubSpot-side
+// automation to fill it in at all. Without setting them here explicitly, both
+// sit blank on every contact we push unless HubSpot's own domain-matching
+// automation happens to fill `company` in (it never touches `country`).
+const contactProps = (contact, ownerId, company) => prune({
   firstname: contact.firstName,
   lastname: contact.lastName,
   email: normalizeEmail(contact.email),
   jobtitle: contact.title,
   linkedin_profile: normalizeLinkedIn(contact.linkedinUrl),
+  company: company?.companyName,
+  country: company?.country,
   hs_marketable_status: false,
   hubspot_owner_id: ownerId,
   hs_lead_status: 'NEW',
@@ -287,7 +294,7 @@ async function pushContact(company, contact, ownerEmail, deps = {}) {
     companyId = created.data.id;
   }
 
-  const createdContact = await request('post', '/crm/v3/objects/contacts', { properties: contactProps(contact, ownerId) });
+  const createdContact = await request('post', '/crm/v3/objects/contacts', { properties: contactProps(contact, ownerId, company) });
   const contactId = createdContact.data.id;
 
   await request('put', `/crm/v4/objects/contacts/${contactId}/associations/default/companies/${companyId}`);
