@@ -4,6 +4,27 @@ const svc = require('../src/services/hubspotService');
 
 beforeEach(() => svc.clearCaches());
 
+// In-memory stand-in for HubspotCompanyLock, so these tests never need a real
+// Mongo connection. `_held` lets a test start with the lock already taken, to
+// simulate a concurrent request that's mid-create.
+function fakeLockModel() {
+  const held = new Set();
+  return {
+    _held: held,
+    async create({ domain }) {
+      if (held.has(domain)) {
+        const err = new Error('E11000 duplicate key error');
+        err.code = 11000;
+        throw err;
+      }
+      held.add(domain);
+    },
+    async deleteOne({ domain }) {
+      held.delete(domain);
+    },
+  };
+}
+
 test('normalizeDomain strips protocol, www, and path', () => {
   assert.equal(svc.normalizeDomain('https://www.acme.com/pricing'), 'acme.com');
   assert.equal(svc.normalizeDomain('acme.io'), 'acme.io');
@@ -127,10 +148,85 @@ test('pushContact creates company + contact + association when nothing matches',
     { companyName: 'Acme', website: 'https://acme.com', country: 'DE', employees: 50 },
     { email: 'jane@acme.com', firstName: 'Jane', lastName: 'Doe', title: 'CTO' },
     'davidv@scytale.ai',
-    { request }
+    { request, lockModel: fakeLockModel() }
   );
   assert.deepEqual(result, { status: 'synced', hubspotContactId: 'c-new', hubspotCompanyId: 'co-new' });
   assert.ok(calls.some((p) => p.includes('/associations/default/companies/co-new')));
+});
+
+test('pushContact creates a fresh company every time when there is no domain to dedupe on (no lock involved)', async () => {
+  const request = async (method, path) => {
+    if (path.startsWith('/crm/v3/owners')) return { data: { results: [{ id: 'owner-1' }] } };
+    if (path === '/crm/v3/objects/contacts/search') return { data: { total: 0, results: [] } };
+    if (path === '/crm/v3/objects/companies') return { data: { id: 'co-new' } };
+    if (path === '/crm/v3/objects/contacts') return { data: { id: 'c-new' } };
+    if (path.includes('/associations/default/companies/')) return { data: {} };
+    throw new Error(`unexpected call: ${path} (there is no domain, so search must never run)`);
+  };
+  const result = await svc.pushContact(
+    { companyName: 'Acme' }, // no website
+    { email: 'jane@acme.com' }, // no stored domain either
+    'davidv@scytale.ai',
+    { request }
+  );
+  assert.deepEqual(result, { status: 'synced', hubspotContactId: 'c-new', hubspotCompanyId: 'co-new' });
+});
+
+test('createCompanyOnce creates the company when the domain lock is free, then releases it', async () => {
+  const lockModel = fakeLockModel();
+  let createCalls = 0;
+  const request = async (method, path) => {
+    if (path === '/crm/v3/objects/companies') { createCalls += 1; return { data: { id: 'co-1' } }; }
+    throw new Error(`unexpected call: ${path}`);
+  };
+  const id = await svc.createCompanyOnce({ companyName: 'Acme' }, 'acme.com', 'owner-1', { request, lockModel });
+  assert.equal(id, 'co-1');
+  assert.equal(createCalls, 1);
+  assert.equal(lockModel._held.has('acme.com'), false, 'lock must be released after a successful create');
+});
+
+test('createCompanyOnce releases the lock even when the HubSpot create call fails', async () => {
+  const lockModel = fakeLockModel();
+  const request = async (method, path) => {
+    if (path === '/crm/v3/objects/companies') throw new Error('HubSpot 500');
+    throw new Error(`unexpected call: ${path}`);
+  };
+  await assert.rejects(() => svc.createCompanyOnce({ companyName: 'Acme' }, 'acme.com', 'owner-1', { request, lockModel }));
+  assert.equal(lockModel._held.has('acme.com'), false, 'lock must be released on failure too, or the domain would be stuck for ~60s');
+});
+
+test('createCompanyOnce: when another request already holds the domain lock, it waits and reuses the company that request creates — never a duplicate', async () => {
+  const lockModel = fakeLockModel();
+  lockModel._held.add('acme.com'); // simulates a concurrent pushContact call mid-create
+  let searchCalls = 0;
+  const request = async (method, path) => {
+    if (path === '/crm/v3/objects/companies/search') {
+      searchCalls += 1;
+      // the concurrent holder's create "lands" on the 2nd poll, not the 1st
+      if (searchCalls < 2) return { data: { total: 0, results: [] } };
+      return { data: { total: 1, results: [{ id: 'co-from-other-request' }] } };
+    }
+    throw new Error(`unexpected call: ${path} (must never create — that would be the duplicate)`);
+  };
+  const id = await svc.createCompanyOnce(
+    { companyName: 'Acme' }, 'acme.com', 'owner-1',
+    { request, lockModel, sleep: async () => {} } // skip the real delay in tests
+  );
+  assert.equal(id, 'co-from-other-request');
+  assert.ok(searchCalls >= 2);
+});
+
+test('createCompanyOnce gives up loudly (without ever creating a duplicate) if the lock holder never finishes', async () => {
+  const lockModel = fakeLockModel();
+  lockModel._held.add('acme.com');
+  const request = async (method, path) => {
+    if (path === '/crm/v3/objects/companies/search') return { data: { total: 0, results: [] } };
+    throw new Error(`unexpected call: ${path}`);
+  };
+  await assert.rejects(
+    () => svc.createCompanyOnce({ companyName: 'Acme' }, 'acme.com', 'owner-1', { request, lockModel, sleep: async () => {} }),
+    (err) => { assert.equal(err.code, 'COMPANY_CREATE_TIMEOUT'); return true; }
+  );
 });
 
 test('pushContact reuses an existing HubSpot company instead of creating a duplicate', async () => {

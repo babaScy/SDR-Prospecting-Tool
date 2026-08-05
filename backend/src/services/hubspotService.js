@@ -1,4 +1,7 @@
 const axios = require('axios');
+const HubspotCompanyLock = require('../models/HubspotCompanyLock');
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ─── OAuth token management (refresh-token flow) ─────────────────────────────
 let cachedToken = null;
@@ -190,6 +193,50 @@ async function findContactByEmailOrLinkedIn(email, linkedinUrl, deps = {}) {
   return { id: hit.id, matchedOn };
 }
 
+// ─── Company creation, serialized per domain (prevents the duplicate-company race) ─
+// findCompanyByDomain + "create if not found" is check-then-act, not atomic: two
+// pushContact calls for the same domain within the same moment can both see "not
+// found" and both create a company. See HubspotCompanyLock for why the lock lives
+// in Mongo rather than in memory.
+const LOCK_WAIT_INTERVAL_MS = 500;
+const LOCK_WAIT_MAX_ATTEMPTS = 40; // ~20s — long enough to cover a concurrent holder's HubSpot create call
+
+async function createCompanyOnce(company, domain, ownerId, deps = {}) {
+  const request = deps.request || hsRequest;
+  const LockModel = deps.lockModel || HubspotCompanyLock;
+  const wait = deps.sleep || sleep;
+
+  let holdsLock = false;
+  try {
+    await LockModel.create({ domain });
+    holdsLock = true;
+  } catch (err) {
+    if (err.code !== 11000) throw err; // not a dup-key clash — a real error, don't swallow it
+  }
+
+  if (holdsLock) {
+    try {
+      const created = await request('post', '/crm/v3/objects/companies', { properties: companyProps(company, domain, ownerId) });
+      return created.data.id;
+    } finally {
+      await LockModel.deleteOne({ domain }).catch(() => {}); // always release, success or failure
+    }
+  }
+
+  // Another request already holds the lock for this domain — it's creating (or
+  // about to create) the company right now. Wait for it to land instead of
+  // racing it, then reuse what it created.
+  for (let attempt = 0; attempt < LOCK_WAIT_MAX_ATTEMPTS; attempt += 1) {
+    await wait(LOCK_WAIT_INTERVAL_MS);
+    const hit = await findCompanyByDomain(domain, { request });
+    if (hit && !hit.ambiguous) return hit.id;
+  }
+  throw new HubspotPushError(
+    'COMPANY_CREATE_TIMEOUT',
+    `Timed out waiting for a concurrent HubSpot company create for domain ${domain} — try again.`
+  );
+}
+
 // ─── Orchestrator: dedup gate + insert-only write for ONE contact ────────────
 class HubspotPushError extends Error {
   constructor(code, message) {
@@ -230,7 +277,12 @@ async function pushContact(company, contact, ownerEmail, deps = {}) {
   }
 
   let companyId = companyHit?.id;
-  if (!companyId) {
+  if (!companyId && domain) {
+    companyId = await createCompanyOnce(company, domain, ownerId, { request, lockModel: deps.lockModel, sleep: deps.sleep });
+  } else if (!companyId) {
+    // No domain to dedupe on at all — nothing to search or lock against, so this
+    // always creates a fresh company. See resolveDomain: this only happens when
+    // both the contact's stored domain and the company's website are missing.
     const created = await request('post', '/crm/v3/objects/companies', { properties: companyProps(company, domain, ownerId) });
     companyId = created.data.id;
   }
@@ -254,6 +306,7 @@ module.exports = {
   companyProps,
   contactProps,
   resolveDomain,
+  createCompanyOnce,
   pushContact,
   HubspotPushError,
   clearCaches,
