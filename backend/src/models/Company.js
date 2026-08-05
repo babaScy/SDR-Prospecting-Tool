@@ -66,6 +66,18 @@ const companySchema = new mongoose.Schema(
       enum: ['pending', 'sourcing', 'found', 'none'],
       default: 'pending',
     },
+
+    // ── HubSpot company resolution (one company per record, resolved once) ───
+    // HubSpot's company-search API is eventually consistent, so it's never safe
+    // to rely on for "does a company already exist for this domain" under
+    // concurrent pushes — two contacts at this company pushed close together
+    // could both see "not found" and both create one. Instead, whichever
+    // contact push resolves this company's HubSpot ID first writes it here,
+    // atomically (see hubspotService.resolveOrCreateCompany), and every later
+    // push for the same company just reads it — no HubSpot search involved.
+    // 'PENDING' is a transient claim marker while a resolve is in flight.
+    hubspotCompanyId: { type: String },
+    hubspotCompanyClaimedAt: { type: Date }, // when the PENDING claim was taken; lets a crashed holder's claim be reclaimed
   },
   { timestamps: true }
 );
