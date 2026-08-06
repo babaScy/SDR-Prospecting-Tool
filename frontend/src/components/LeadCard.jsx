@@ -1,4 +1,5 @@
 import { getCompanyHref } from '../utils/companyLink';
+import { complianceBadge } from '../utils/compliance';
 
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified' };
 
@@ -16,6 +17,7 @@ export default function LeadCard({ lead }) {
   const q = lead.qualification || {};
   const domain = lead.website?.replace(/^https?:\/\//, '').replace(/\/$/, '');
   const companyHref = getCompanyHref(lead.website);
+  const compliance = complianceBadge(q);
 
   return (
     <div className="lead-card">
@@ -25,6 +27,7 @@ export default function LeadCard({ lead }) {
           <a href={lead.website} target="_blank" rel="noreferrer">{domain}</a>
         )}
         <span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span>
+        <span className={`badge ${compliance.compliant ? 'compliant' : 'compliance-unconfirmed'}`}>{compliance.label}</span>
       </div>
 
       {q.reasoning && <div className="reasoning">{q.reasoning}</div>}
@@ -39,7 +42,6 @@ export default function LeadCard({ lead }) {
         <Signal label="Product" value={q.productDescription} />
         <Signal label="Target persona" value={q.targetPersona} />
         <Signal label="B2B / SaaS" value={q.isB2B && `B2B: ${q.isB2B} · SaaS: ${q.isSaaS}`} />
-        <Signal label="Compliance frameworks" value={q.frameworks} />
         <Signal label="Compliance language" value={q.complianceLanguage} />
         <Signal label="Integrations" value={q.integrations} />
         <Signal label="Notable customers" value={q.customers} />

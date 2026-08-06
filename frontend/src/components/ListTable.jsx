@@ -2,10 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchLeads, sendDecision } from '../api';
 import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../icons';
 import { getCompanyHref } from '../utils/companyLink';
+import { complianceBadge } from '../utils/compliance';
 
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified', pending: 'Pending' };
 const SDR_LABELS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
 
+// 'Compliance' is rendered between 'country' and 'status' below but left
+// out of COLUMNS (which drives the sortable headers) since a badge + a
+// free-text framework list has no natural sort order — same treatment as
+// the unsorted 'Actions' column.
 const COLUMNS = [
   { key: 'companyName', label: 'Name' },
   { key: 'employees', label: 'Employees' },
@@ -107,7 +112,16 @@ export default function ListTable({ listId, onDecision }) {
         <table className="table-plain">
           <thead>
             <tr>
-              {COLUMNS.map((col) => (
+              {COLUMNS.slice(0, 3).map((col) => (
+                <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
+                  {col.label}
+                  {sort.key === col.key && (
+                    <span className="sort-icon">{sort.dir === 1 ? <IconChevronUp /> : <IconChevronDown />}</span>
+                  )}
+                </th>
+              ))}
+              <th>Compliance</th>
+              {COLUMNS.slice(3).map((col) => (
                 <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
                   {col.label}
                   {sort.key === col.key && (
@@ -121,11 +135,20 @@ export default function ListTable({ listId, onDecision }) {
           <tbody>
             {rows.map((lead) => {
               const companyHref = getCompanyHref(lead.website);
+              const compliance = complianceBadge(lead.qualification);
               return (
               <tr key={lead._id}>
                 <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
                 <td>{lead.employees ?? '—'}</td>
                 <td>{lead.country || '—'}</td>
+                <td>
+                  <span
+                    className={`badge compliance-cell ${compliance.compliant ? 'compliant' : 'compliance-unconfirmed'}`}
+                    title={compliance.frameworks || undefined}
+                  >
+                    {compliance.label}
+                  </span>
+                </td>
                 <td><span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span></td>
                 <td><span className={`badge ${lead.sdrStatus}`}>{SDR_LABELS[lead.sdrStatus] || lead.sdrStatus}</span></td>
                 <td>

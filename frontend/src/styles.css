@@ -195,6 +195,7 @@ th {
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--text); }
 th .sort-icon { display: inline-flex; vertical-align: -3px; margin-left: 2px; color: var(--primary); }
+.compliance-cell { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tbody tr { cursor: pointer; transition: background var(--dur-fast); }
 tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .table-plain tbody tr { cursor: default; }
@@ -215,8 +216,11 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .badge.disqualified, .badge.failed, .badge.rejected {
   background: rgba(244, 96, 108, 0.14); color: var(--red); border-color: rgba(244, 96, 108, 0.3);
 }
-.badge.reviewed, .badge.pending, .badge.none, .badge.sourcing {
+.badge.reviewed, .badge.pending, .badge.none, .badge.sourcing, .badge.compliance-unconfirmed {
   background: rgba(97, 98, 245, 0.16); color: var(--scy-indigo-200); border-color: var(--border-brand);
+}
+.badge.compliant {
+  background: rgba(0, 193, 99, 0.14); color: var(--green); border-color: rgba(0, 193, 99, 0.3);
 }
 
 /* ── Progress ───────────────────────────────────────────────────────────── */
