@@ -18,6 +18,15 @@ const COMMON_FILTERS = {
     'it director', 'head of security', 'technical director', 'director of technology',
     'director of engineering', 'director of product', 'director of operations',
     'director', 'general manager',
+    // Security/compliance-buyer titles — added 2026-08-11 to better match
+    // Scytale's actual buyer persona (see docs/superpowers/specs/2026-08-11-
+    // broaden-apollo-sourcing-filters-design.md). Live-tested at ~0% pool-size
+    // impact (the existing generic titles already admit most matching
+    // companies), so these are for buyer-persona precision, not volume.
+    'chief information security officer', 'cio', 'chief information officer',
+    'vp security', 'head of information security', 'director of information security',
+    'head of product security', 'head of trust', 'vp trust and safety',
+    'head of compliance', 'compliance manager', 'vp compliance',
   ],
   prospected_by_current_team: ['no'],
   market_segments: ['b2b', 'saas'],
@@ -29,6 +38,12 @@ const COMMON_FILTERS = {
     'ai',
     'b2b software',
     'data platform',
+    // Added 2026-08-11 — DB-correlation-backed (1.3x-2.2x qualify-rate lift)
+    // and live-tested at +39%-+43% pool-size lift. See design doc above.
+    'computer software',
+    'software as a service',
+    'api integration',
+    'workflow automation',
   ],
   included_organization_keyword_fields: ['tags', 'name'],
   q_not_organization_keyword_tags: [
@@ -43,7 +58,16 @@ const COMMON_FILTERS = {
     'custom solutions',
     'custom software development',
     'technology consulting',
-    'software development',
+    // 'software development' (bare) replaced 2026-08-11 — it matched against
+    // tags/name/social_media_description broadly and was suppressing roughly
+    // half-to-two-thirds of each region's icp2 pool (live-tested), with no DB
+    // evidence it was doing necessary exclusion work the more specific phrases
+    // below don't already cover. Highest-uncertainty change in this batch —
+    // see monitoring plan in the design doc.
+    'software development services',
+    'software development agency',
+    'outsourced software development',
+    'software development consultancy',
     'staffing & recruiting',
     'venture capital',
     'events',
