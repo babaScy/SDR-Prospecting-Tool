@@ -4,7 +4,7 @@ const REGIONS = {
   benelux: ['Luxembourg', 'Netherlands', 'Belgium'],
   nordics: ['Norway', 'Finland', 'Denmark', 'Sweden'],
   dach:    ['Germany', 'Switzerland', 'Austria'],
-  aus:     ['Australia'],
+  aus:     ['Australia', 'New Zealand'],
   poland:  ['Poland'],
   taiwan:  ['Taiwan','Singapore','South Korea'],
 };
