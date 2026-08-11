@@ -1,3 +1,4 @@
 node_modules/
 .env
 dist/
+backend/scripts/research_*_data.json
