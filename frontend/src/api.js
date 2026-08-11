@@ -63,3 +63,6 @@ export const sendDecision = (leadId, decision) =>
 
 export const pushContactToHubspot = (contactId) =>
   request(`/api/contacts/${contactId}/hubspot`, { method: 'POST' });
+
+export const pushCompanyToHubspot = (companyId) =>
+  request(`/api/leads/${companyId}/hubspot`, { method: 'POST' });

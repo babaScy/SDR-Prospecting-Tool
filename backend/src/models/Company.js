@@ -78,6 +78,14 @@ const companySchema = new mongoose.Schema(
     // 'PENDING' is a transient claim marker while a resolve is in flight.
     hubspotCompanyId: { type: String },
     hubspotCompanyClaimedAt: { type: Date }, // when the PENDING claim was taken; lets a crashed holder's claim be reclaimed
+
+    // ── HubSpot push audit (company pushed on its own, with no contacts) ─────
+    // Only relevant when contactStatus is 'none' — see routes/leads.js. Mirrors
+    // Contact's hubspotStatus/hubspotSyncedAt/hubspotSyncedBy/hubspotError.
+    hubspotPushStatus: { type: String, enum: ['none', 'synced', 'failed'], default: 'none' },
+    hubspotPushedAt: { type: Date },
+    hubspotPushedBy: { type: String },
+    hubspotPushError: { type: String },
   },
   { timestamps: true }
 );

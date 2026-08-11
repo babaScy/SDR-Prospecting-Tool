@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchContacts, fetchList, pushContactToHubspot } from '../api';
+import { fetchContacts, fetchList, pushContactToHubspot, pushCompanyToHubspot } from '../api';
 import { IconMail, IconLinkedin, IconPhone, IconStar, IconCheck } from '../icons';
 import { getCompanyHref } from '../utils/companyLink';
 
@@ -72,7 +72,39 @@ function ContactCard({ c, onPushed, companyBusy, claimPush, releasePush }) {
   );
 }
 
-function CompanyContacts({ company, contacts, onPushed }) {
+// Shown in place of a contact row when contact sourcing ran and found nobody
+// (contactStatus: 'none') — the only way such a company can reach HubSpot,
+// since there's no Contact to push it as a side effect of.
+function CompanyHubspotButton({ company, onPushed }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const push = async () => {
+    setBusy(true);
+    setErr('');
+    try {
+      onPushed(await pushCompanyToHubspot(company._id));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const synced = company.hubspotPushStatus === 'synced';
+  const label = synced ? 'In HubSpot' : busy ? 'Adding…' : 'Add to HubSpot';
+
+  return (
+    <div className="contact-actions">
+      <button className="btn small ghost" onClick={push} disabled={busy || synced}>
+        {synced && <IconCheck width={14} height={14} />} {label}
+      </button>
+      {(err || company.hubspotPushError) && <div className="error">{err || company.hubspotPushError}</div>}
+    </div>
+  );
+}
+
+function CompanyContacts({ company, contacts, onPushed, onCompanyPushed }) {
   // A ref, not just state, because the claim must be synchronous: two clicks
   // in the same tick (before React re-renders to disable the sibling button)
   // must not both succeed. State exists purely to re-render and grey the
@@ -110,7 +142,12 @@ function CompanyContacts({ company, contacts, onPushed }) {
               onPushed={onPushed}
             />
           ))}</div>
-        : <p className="muted">No decision-maker found.</p>}
+        : (
+          <>
+            <p className="muted">No decision-maker found.</p>
+            {company.contactStatus === 'none' && <CompanyHubspotButton company={company} onPushed={onCompanyPushed} />}
+          </>
+        )}
     </div>
   );
 }
@@ -142,6 +179,10 @@ export default function ContactsScreen({ listId }) {
     contacts: g.contacts.map((existing) => (existing._id === updated._id ? updated : existing)),
   })));
 
+  const onCompanyPushed = (updated) => setGroups((prev) => prev.map((g) => (
+    g.company._id === updated._id ? { ...g, company: updated } : g
+  )));
+
   return (
     <div>
       <div className="panel">
@@ -165,7 +206,7 @@ export default function ContactsScreen({ listId }) {
       </div>
 
       {groups.map(({ company, contacts }) => (
-        <CompanyContacts key={company._id} company={company} contacts={contacts} onPushed={onPushed} />
+        <CompanyContacts key={company._id} company={company} contacts={contacts} onPushed={onPushed} onCompanyPushed={onCompanyPushed} />
       ))}
     </div>
   );
