@@ -525,6 +525,22 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 }
 .reb-head { display: flex; align-items: flex-start; gap: 8px; }
 .reb-head .opt-toggle { flex: 1; }
+.reb-head .rebuttal-num + .star-btn { margin-left: auto; }
+
+/* .text/.label are scoped under .rebuttal (not left as bare global
+   selectors, unlike the source page) since this is a shared app where
+   generic class names like "text"/"label" are a collision risk for
+   future unrelated work. */
+.rebuttal .label {
+  font-size: 10.5px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 0 6px;
+}
+.rebuttal .text { font-size: 14.5px; color: var(--text); line-height: 1.65; margin: 4px 0; }
+.rebuttal .text strong { color: var(--scy-indigo-200); font-weight: 600; }
+.rebuttal .text em { color: var(--text-2); font-style: italic; }
+.rebuttal ul.text { margin: 6px 0; padding-left: 20px; }
+.rebuttal ul.text li { margin: 4px 0; }
+.branch .text { font-size: 14px; }
 .opt-toggle {
   display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
   background: rgba(97, 98, 245, 0.1); border: 1px solid var(--border-brand); border-radius: var(--radius-sm);

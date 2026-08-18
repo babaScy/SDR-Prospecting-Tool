@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { IconStar } from '../icons';
 import { postObjectionFeedback } from '../api';
 
@@ -28,11 +28,14 @@ export default function ObjectionModal({ objection, feedback, onClose, onFeedbac
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
 
+  useEffect(() => {
+    saveStars(stars);
+  }, [stars]);
+
   const toggleStar = (key) => {
     setStars((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
-      saveStars(next);
       return next;
     });
   };

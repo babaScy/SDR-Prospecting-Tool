@@ -26,7 +26,7 @@ export default function AppSwitcher({ current, onSelect }) {
   return (
     <div className="app-switcher" ref={ref}>
       <button className="app-switcher-trigger" onClick={() => setOpen((o) => !o)} type="button">
-        <span className="wordmark-text">{currentLabel}</span>
+        <span>{currentLabel}</span>
         <span className="app-switcher-chev">▾</span>
       </button>
       {open && (
