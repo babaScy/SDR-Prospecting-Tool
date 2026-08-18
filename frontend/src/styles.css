@@ -525,7 +525,7 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 }
 .reb-head { display: flex; align-items: flex-start; gap: 8px; }
 .reb-head .opt-toggle { flex: 1; }
-.reb-head .rebuttal-num + .star-btn { margin-left: auto; }
+.reb-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
 /* .text/.label are scoped under .rebuttal (not left as bare global
    selectors, unlike the source page) since this is a shared app where
@@ -573,6 +573,24 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .star-btn { background: transparent; border: none; cursor: pointer; color: var(--muted); padding: 4px; flex-shrink: 0; transition: transform var(--dur-fast); }
 .star-btn:hover { color: var(--amber); transform: scale(1.15); }
 .star-btn.starred { color: var(--amber); }
+.star-btn:disabled, .vote-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.vote-controls { display: flex; align-items: center; gap: 4px; }
+.vote-btn {
+  background: transparent; border: none; cursor: pointer; color: var(--muted);
+  padding: 4px; display: flex; align-items: center; justify-content: center;
+  transition: color var(--dur-fast), transform var(--dur-fast);
+}
+.vote-btn:hover:not(:disabled) { color: var(--scy-indigo-200); transform: scale(1.15); }
+.vote-btn.active.up { color: var(--green); }
+.vote-btn.active.down { color: var(--red); }
+.vote-score { font-size: 12px; font-weight: 700; color: var(--text-2); min-width: 16px; text-align: center; }
+
+.starred-section-label {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+  color: var(--amber); text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 4px 0 10px;
+}
 
 .fb-wrap { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 12px; }
 .fb-toggle {
