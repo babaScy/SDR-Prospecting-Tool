@@ -3,6 +3,7 @@ import { fetchLeads, sendDecision } from '../api';
 import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../icons';
 import { getCompanyHref } from '../utils/companyLink';
 import { complianceBadge } from '../utils/compliance';
+import { disagreesWithVerdict } from '../utils/verdict';
 
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified', pending: 'Pending' };
 const SDR_LABELS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
@@ -36,6 +37,8 @@ export default function ListTable({ listId, onDecision }) {
   const [sdrFilter, setSdrFilter] = useState('all');
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [busyIds, setBusyIds] = useState(() => new Set());
+  const [override, setOverride] = useState(null); // { lead, decision } | null
+  const [overrideComment, setOverrideComment] = useState('');
 
   useEffect(() => {
     fetchLeads(listId)
@@ -59,15 +62,17 @@ export default function ListTable({ listId, onDecision }) {
     setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
   };
 
-  const decide = async (lead, decision) => {
+  const submitDecision = async (lead, decision, comment) => {
     setBusyIds((prev) => new Set(prev).add(lead._id));
     setError('');
     try {
-      const updated = await sendDecision(lead._id, decision);
+      const updated = await sendDecision(lead._id, decision, comment);
       setLeads((prev) => prev.map((l) => (l._id === lead._id ? { ...l, sdrStatus: updated.sdrStatus } : l)));
       // The backend flips the list ready <-> reviewed off the last pending lead,
       // so the parent has to re-read it for the confirm bar to appear here.
       onDecision?.();
+      setOverride(null);
+      setOverrideComment('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -77,6 +82,23 @@ export default function ListTable({ listId, onDecision }) {
         return next;
       });
     }
+  };
+
+  // Agreeing with the AI submits immediately, same as before. Disagreeing
+  // pops a small dialog first so the SDR can optionally say why — a per-row
+  // textarea in a dense table would be unreadable.
+  const decide = (lead, decision) => {
+    if (disagreesWithVerdict(decision, lead.status)) {
+      setOverride({ lead, decision });
+      setOverrideComment('');
+      return;
+    }
+    submitDecision(lead, decision);
+  };
+
+  const cancelOverride = () => {
+    setOverride(null);
+    setOverrideComment('');
   };
 
   if (error && !leads) return <p className="error">{error}</p>;
@@ -172,6 +194,35 @@ export default function ListTable({ listId, onDecision }) {
             })}
           </tbody>
         </table>
+      )}
+      {override && (
+        <div className="overlay" onClick={cancelOverride}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <p>
+              {override.decision === 'accepted' ? 'Accepting' : 'Rejecting'} <strong>{override.lead.companyName}</strong> goes
+              against the AI's verdict ({VERDICT_LABELS[override.lead.status] || override.lead.status}) — want to note why? (optional)
+            </p>
+            <textarea
+              rows={3}
+              autoFocus
+              value={overrideComment}
+              onChange={(e) => setOverrideComment(e.target.value)}
+              placeholder="e.g. AI missed that they're a consultancy, not SaaS"
+            />
+            <div className="decision-row">
+              <button className="btn ghost" onClick={cancelOverride} disabled={busyIds.has(override.lead._id)}>
+                Cancel
+              </button>
+              <button
+                className={`btn ${override.decision === 'accepted' ? 'accept' : 'reject'}`}
+                onClick={() => submitDecision(override.lead, override.decision, overrideComment)}
+                disabled={busyIds.has(override.lead._id)}
+              >
+                {override.decision === 'accepted' ? <IconCheck /> : <IconX />} Confirm {override.decision === 'accepted' ? 'accept' : 'reject'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

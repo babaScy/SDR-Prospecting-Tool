@@ -135,6 +135,30 @@ test('decision undo (pending) reopens the list', async () => {
   assert.equal(fresh.status, 'ready');
 });
 
+test('decision comment is stored when provided', async () => {
+  const { a } = await seedList('davidv@scytale.ai');
+  const res = await asSdr(request(app).post(`/api/leads/${a._id}/decision`))
+    .send({ decision: 'rejected', comment: 'AI missed that they are a consultancy, not SaaS' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.sdrComment, 'AI missed that they are a consultancy, not SaaS');
+});
+
+test('decision comment is optional', async () => {
+  const { a } = await seedList('davidv@scytale.ai');
+  const res = await asSdr(request(app).post(`/api/leads/${a._id}/decision`)).send({ decision: 'accepted' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.sdrComment, undefined);
+});
+
+test('decision comment is cleared when the decision is undone to pending', async () => {
+  const { a } = await seedList('davidv@scytale.ai');
+  await asSdr(request(app).post(`/api/leads/${a._id}/decision`))
+    .send({ decision: 'rejected', comment: 'disagree with AI' });
+  const res = await asSdr(request(app).post(`/api/leads/${a._id}/decision`)).send({ decision: 'pending' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.sdrComment, undefined);
+});
+
 test('decision validates input and 404s on unknown lead', async () => {
   const { a } = await seedList('davidv@scytale.ai');
   const bad = await asSdr(request(app).post(`/api/leads/${a._id}/decision`)).send({ decision: 'maybe' });

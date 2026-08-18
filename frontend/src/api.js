@@ -58,8 +58,8 @@ export const fetchLeads = (id, bucket) =>
 export const confirmReview = (id) => request(`/api/lists/${id}/confirm-review`, { method: 'POST' });
 export const fetchContacts = (id) => request(`/api/lists/${id}/contacts`);
 
-export const sendDecision = (leadId, decision) =>
-  request(`/api/leads/${leadId}/decision`, { method: 'POST', body: JSON.stringify({ decision }) });
+export const sendDecision = (leadId, decision, comment) =>
+  request(`/api/leads/${leadId}/decision`, { method: 'POST', body: JSON.stringify({ decision, comment }) });
 
 export const pushContactToHubspot = (contactId) =>
   request(`/api/contacts/${contactId}/hubspot`, { method: 'POST' });

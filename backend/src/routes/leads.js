@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.post('/:id/decision', async (req, res, next) => {
   try {
-    const { decision } = req.body || {};
+    const { decision, comment } = req.body || {};
     if (!['accepted', 'rejected', 'pending'].includes(decision)) {
       return res.status(400).json({ error: "decision must be 'accepted', 'rejected' or 'pending'" });
     }
@@ -33,9 +33,21 @@ router.post('/:id/decision', async (req, res, next) => {
       });
     }
 
+    // Comment is optional and only meaningful while a decision stands — undoing
+    // back to pending clears it along with sdrReviewedAt. $unset (not $set to
+    // undefined, which the driver just omits) is what actually clears it.
+    const trimmedComment = typeof comment === 'string' ? comment.trim() : '';
+    const keepComment = decision !== 'pending' && trimmedComment;
     const company = await Company.findByIdAndUpdate(
       req.params.id,
-      { $set: { sdrStatus: decision, sdrReviewedAt: decision === 'pending' ? null : new Date() } },
+      {
+        $set: {
+          sdrStatus: decision,
+          sdrReviewedAt: decision === 'pending' ? null : new Date(),
+          ...(keepComment ? { sdrComment: trimmedComment } : {}),
+        },
+        ...(keepComment ? {} : { $unset: { sdrComment: 1 } }),
+      },
       { new: true }
     );
 

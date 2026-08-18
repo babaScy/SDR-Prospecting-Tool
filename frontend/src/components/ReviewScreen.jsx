@@ -3,6 +3,7 @@ import { fetchLeads, sendDecision, confirmReview } from '../api';
 import { IconCheck, IconX, IconUndo, IconArrowLeft } from '../icons';
 import LeadCard from './LeadCard';
 import { hasUsableDomain } from '../utils/companyLink';
+import { disagreesWithVerdict } from '../utils/verdict';
 
 const BUCKETS = ['qualified', 'nei', 'disqualified'];
 
@@ -15,6 +16,8 @@ export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+  const [overrideDecision, setOverrideDecision] = useState(null); // 'accepted' | 'rejected' | null
+  const [overrideComment, setOverrideComment] = useState('');
 
   useEffect(() => {
     Promise.all(BUCKETS.map((bucket) => fetchLeads(listId, bucket)))
@@ -38,18 +41,36 @@ export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
 
   const current = queue[0];
 
-  const decide = async (decision) => {
+  const submitDecision = async (decision, comment) => {
     setBusy(true);
     setError('');
     try {
-      await sendDecision(current._id, decision);
+      await sendDecision(current._id, decision, comment);
       setDone([...done, { lead: current, decision }]);
       setQueue(queue.slice(1));
+      setOverrideDecision(null);
+      setOverrideComment('');
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
     }
+  };
+
+  // Agreeing with the AI submits immediately, same as before. Disagreeing
+  // opens an inline panel first so the SDR can optionally say why.
+  const decide = (decision) => {
+    if (disagreesWithVerdict(decision, current.status)) {
+      setOverrideDecision(decision);
+      setOverrideComment('');
+      return;
+    }
+    submitDecision(decision);
+  };
+
+  const cancelOverride = () => {
+    setOverrideDecision(null);
+    setOverrideComment('');
   };
 
   const undo = async () => {
@@ -125,18 +146,44 @@ export default function ReviewScreen({ listId, onBack, onReviewConfirmed }) {
             Apollo has no website domain for this company, so no contacts can be found for it — it can only be rejected.
           </p>
         )}
-        <div className="decision-row">
-          <button
-            className="btn accept big"
-            onClick={() => decide('accepted')}
-            disabled={busy || noDomain}
-            title={noDomain ? 'No domain on Apollo — contacts cannot be sourced' : undefined}
-          >
-            <IconCheck /> Accept
-          </button>
-          <button className="btn reject big" onClick={() => decide('rejected')} disabled={busy}><IconX /> Reject</button>
-          <button className="btn ghost" onClick={undo} disabled={busy || !done.length}><IconUndo /> Undo last</button>
-        </div>
+        {overrideDecision ? (
+          <div className="override-panel">
+            <label htmlFor="override-comment">
+              That goes against the AI's verdict ({VERDICT_LABELS[current.status] || current.status}) — want to note why? (optional)
+            </label>
+            <textarea
+              id="override-comment"
+              rows={2}
+              autoFocus
+              value={overrideComment}
+              onChange={(e) => setOverrideComment(e.target.value)}
+              placeholder="e.g. AI missed that they're a consultancy, not SaaS"
+            />
+            <div className="decision-row">
+              <button
+                className={`btn ${overrideDecision === 'accepted' ? 'accept' : 'reject'} big`}
+                onClick={() => submitDecision(overrideDecision, overrideComment)}
+                disabled={busy}
+              >
+                {overrideDecision === 'accepted' ? <IconCheck /> : <IconX />} Confirm {overrideDecision === 'accepted' ? 'accept' : 'reject'}
+              </button>
+              <button className="btn ghost" onClick={cancelOverride} disabled={busy}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="decision-row">
+            <button
+              className="btn accept big"
+              onClick={() => decide('accepted')}
+              disabled={busy || noDomain}
+              title={noDomain ? 'No domain on Apollo — contacts cannot be sourced' : undefined}
+            >
+              <IconCheck /> Accept
+            </button>
+            <button className="btn reject big" onClick={() => decide('rejected')} disabled={busy}><IconX /> Reject</button>
+            <button className="btn ghost" onClick={undo} disabled={busy || !done.length}><IconUndo /> Undo last</button>
+          </div>
+        )}
         {error && <p className="error">{error}</p>}
       </div>
     </div>

@@ -59,6 +59,11 @@ const companySchema = new mongoose.Schema(
       default: 'pending',
     },
     sdrReviewedAt: { type: Date },
+    // Optional note the SDR leaves when their decision overrides the AI
+    // verdict (accepting a nei/disqualified company, or rejecting a
+    // qualified one) — why they didn't go with the AI's call. Cleared
+    // whenever the decision is undone back to pending.
+    sdrComment: { type: String },
 
     // ── Contact sourcing (runs after the SDR confirms their review) ──────────
     contactStatus: {

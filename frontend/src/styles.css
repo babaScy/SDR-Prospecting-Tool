@@ -313,6 +313,9 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .signal .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 4px; }
 .signal .v { font-size: 13px; line-height: 1.45; }
 .decision-row { display: flex; gap: 14px; margin-top: 20px; align-items: center; flex-wrap: wrap; }
+.override-panel { margin-top: 20px; }
+.override-panel label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+.override-panel .decision-row { margin-top: 12px; }
 
 /* ── Sign in ────────────────────────────────────────────────────────────── */
 .login-wrap {
@@ -382,6 +385,35 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
     var(--panel);
 }
 .confirm-bar .error { margin: 6px 0 0; }
+
+/* ── Generic overlay dialog (e.g. table-view override comment) ────────────── */
+.overlay {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(6, 6, 20, 0.55);
+}
+.dialog {
+  /* var(--panel) alone is a ~4% white tint meant to sit on the solid page
+     background — over the translucent .overlay scrim there's nothing solid
+     behind it, so it reads as transparent. Composite it onto var(--bg) so the
+     dialog is opaque on its own, regardless of what's behind the overlay. */
+  background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-card);
+  width: 100%; max-width: 440px;
+}
+.dialog p { margin: 0 0 12px; line-height: 1.5; color: var(--text-2); }
+.dialog .decision-row { margin-top: 14px; justify-content: flex-end; }
+
+/* Shared by the card-view override panel and the table-view dialog. */
+.override-panel textarea, .dialog textarea {
+  width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.override-panel textarea:focus, .dialog textarea:focus {
+  outline: none; border-color: var(--primary); box-shadow: var(--glow-indigo-sm);
+}
 
 /* ---------- Wolf landing splash ---------- */
 /* The traced wolf is black-on-transparent, so its alpha channel masks each
