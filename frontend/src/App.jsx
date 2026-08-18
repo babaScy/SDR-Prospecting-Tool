@@ -3,6 +3,8 @@ import PullScreen from './components/PullScreen';
 import SdrPullScreen from './components/SdrPullScreen';
 import ListsScreen from './components/ListsScreen';
 import ListDetailScreen from './components/ListDetailScreen';
+import AppSwitcher from './components/AppSwitcher';
+import ObjectionsScreen from './components/ObjectionsScreen';
 import LoginScreen from './components/LoginScreen';
 import ChangePasswordScreen from './components/ChangePasswordScreen';
 import WolfSplash from './components/WolfSplash';
@@ -83,20 +85,25 @@ export default function App() {
         <div className="wordmark">
           <img className="wordmark-logo" src="/sales-logo-light.svg" alt="Scytale Sales" />
           <span className="wordmark-rule" />
-          <span className="wordmark-text">Prospector</span>
+          <AppSwitcher
+            current={view.name === 'objections' ? 'objections' : 'prospector'}
+            onSelect={(key) => setView(key === 'objections' ? { name: 'objections' } : defaultView(user))}
+          />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <nav>
-            <button className={view.name === 'pull' ? 'active' : ''} onClick={() => setView({ name: 'pull' })}>
-              Pull
-            </button>
-            <button
-              className={view.name === 'lists' || view.name === 'list' ? 'active' : ''}
-              onClick={() => setView({ name: 'lists' })}
-            >
-              Lists
-            </button>
-          </nav>
+          {view.name !== 'objections' && (
+            <nav>
+              <button className={view.name === 'pull' ? 'active' : ''} onClick={() => setView({ name: 'pull' })}>
+                Pull
+              </button>
+              <button
+                className={view.name === 'lists' || view.name === 'list' ? 'active' : ''}
+                onClick={() => setView({ name: 'lists' })}
+              >
+                Lists
+              </button>
+            </nav>
+          )}
           <div className="user-chip">
             <div className={`avatar role-${user.role}`}>{user.email[0]}</div>
             <div className="user-chip-text">
@@ -118,6 +125,7 @@ export default function App() {
           <ListsScreen isAdmin={user.role === 'admin'} onOpen={(listId) => setView({ name: 'list', listId })} />
         )}
         {view.name === 'list' && <ListDetailScreen listId={view.listId} onBack={() => setView({ name: 'lists' })} />}
+        {view.name === 'objections' && <ObjectionsScreen />}
       </main>
     </div>
   );
