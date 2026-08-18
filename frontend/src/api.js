@@ -71,3 +71,11 @@ export const fetchObjectionFeedback = () => request('/api/objection-feedback');
 
 export const postObjectionFeedback = (objection, text) =>
   request('/api/objection-feedback', { method: 'POST', body: JSON.stringify({ objection, text }) });
+
+export const fetchObjectionResponses = () => request('/api/objection-responses');
+
+export const starObjectionResponse = (objection, boxTitle) =>
+  request('/api/objection-responses/star', { method: 'POST', body: JSON.stringify({ objection, boxTitle }) });
+
+export const voteObjectionResponse = (objection, boxTitle, value) =>
+  request('/api/objection-responses/vote', { method: 'POST', body: JSON.stringify({ objection, boxTitle, value }) });
