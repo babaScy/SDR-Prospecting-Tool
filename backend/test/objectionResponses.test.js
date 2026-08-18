@@ -75,6 +75,16 @@ test('netScore sums votes across multiple SDRs; GET never exposes another SDR\'s
   assert.equal(khadyRow.myStarred, false);
 });
 
+test('POST /api/objection-responses/star and /vote reject non-string objection/boxTitle', async () => {
+  const starBadTitle = await asSdr(request(app).post('/api/objection-responses/star'))
+    .send({ objection: 'Not Interested', boxTitle: { $gt: '' } });
+  assert.equal(starBadTitle.status, 400);
+
+  const voteBadObjection = await asSdr(request(app).post('/api/objection-responses/vote'))
+    .send({ objection: { $gt: '' }, boxTitle: 'Initial Response 1', value: 1 });
+  assert.equal(voteBadObjection.status, 400);
+});
+
 test('objection-responses routes are 401 without a session', async () => {
   const res = await request(app).get('/api/objection-responses');
   assert.equal(res.status, 401);

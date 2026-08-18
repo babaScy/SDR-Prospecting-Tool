@@ -11,6 +11,15 @@ async function netScoreFor(objection, boxTitle) {
   return row?.netScore ?? 0;
 }
 
+function validObjectionKey(objection, boxTitle) {
+  return (
+    typeof objection === 'string' &&
+    typeof boxTitle === 'string' &&
+    !!objection.trim() &&
+    !!boxTitle.trim()
+  );
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const scores = await ObjectionInteraction.aggregate([
@@ -38,7 +47,9 @@ router.get('/', async (req, res, next) => {
 router.post('/star', async (req, res, next) => {
   try {
     const { objection, boxTitle } = req.body || {};
-    if (!objection || !boxTitle) return res.status(400).json({ error: 'objection and boxTitle are required' });
+    if (!validObjectionKey(objection, boxTitle)) {
+      return res.status(400).json({ error: 'objection and boxTitle are required' });
+    }
 
     const existing = await ObjectionInteraction.findOne({ objection, boxTitle, userEmail: req.user.email });
     const doc = await ObjectionInteraction.findOneAndUpdate(
@@ -56,7 +67,9 @@ router.post('/star', async (req, res, next) => {
 router.post('/vote', async (req, res, next) => {
   try {
     const { objection, boxTitle, value } = req.body || {};
-    if (!objection || !boxTitle) return res.status(400).json({ error: 'objection and boxTitle are required' });
+    if (!validObjectionKey(objection, boxTitle)) {
+      return res.status(400).json({ error: 'objection and boxTitle are required' });
+    }
     if (value !== 1 && value !== -1) return res.status(400).json({ error: 'value must be 1 or -1' });
 
     const existing = await ObjectionInteraction.findOne({ objection, boxTitle, userEmail: req.user.email });
