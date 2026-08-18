@@ -585,3 +585,15 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .fb-form textarea:focus { outline: none; border-color: var(--primary); box-shadow: var(--glow-indigo-sm); }
 .fb-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .fb-note { font-size: 11px; color: var(--muted); line-height: 1.5; flex: 1; min-width: 200px; }
+
+/* ── Objection Handler: search + card grid ──────────────────────────────── */
+.objection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.objection-card {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 18px; text-align: left; font-family: inherit; color: inherit; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 14px; min-height: 110px;
+  transition: border-color var(--dur-fast), transform var(--dur-base) var(--ease-out);
+}
+.objection-card:hover { border-color: var(--border-brand); transform: translateY(-2px); }
+.objection-card-title { font-weight: 600; font-size: 15px; line-height: 1.4; }
+.objection-card-foot { display: flex; align-items: center; gap: 8px; }
