@@ -66,3 +66,8 @@ export const pushContactToHubspot = (contactId) =>
 
 export const pushCompanyToHubspot = (companyId) =>
   request(`/api/leads/${companyId}/hubspot`, { method: 'POST' });
+
+export const fetchObjectionFeedback = () => request('/api/objection-feedback');
+
+export const postObjectionFeedback = (objection, text) =>
+  request('/api/objection-feedback', { method: 'POST', body: JSON.stringify({ objection, text }) });
