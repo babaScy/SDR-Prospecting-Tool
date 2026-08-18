@@ -23,6 +23,7 @@ app.use('/api/leads', require('./routes/leads'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/objection-feedback', require('./routes/objectionFeedback'));
+app.use('/api/objection-responses', require('./routes/objectionResponses'));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
