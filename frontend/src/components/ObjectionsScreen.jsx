@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { OBJECTIONS } from '../data/objections';
-import { fetchObjectionFeedback } from '../api';
+import { fetchObjectionFeedback, fetchObjectionResponses } from '../api';
 import ObjectionModal from './ObjectionModal';
 
 export default function ObjectionsScreen() {
   const [search, setSearch] = useState('');
   const [feedback, setFeedback] = useState([]);
+  const [responses, setResponses] = useState([]);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null); // one OBJECTIONS entry, or null
 
   useEffect(() => {
     fetchObjectionFeedback().then(setFeedback).catch((e) => setError(e.message));
+    fetchObjectionResponses().then(setResponses).catch((e) => setError(e.message));
   }, []);
 
   const q = search.trim().toLowerCase();
@@ -20,6 +22,13 @@ export default function ObjectionsScreen() {
 
   const countFor = (name) => feedback.filter((f) => f.objection === name).length;
   const onFeedbackPosted = (entry) => setFeedback((prev) => [entry, ...prev]);
+  const onResponseChanged = (updated) => setResponses((prev) => {
+    const idx = prev.findIndex((r) => r.objection === updated.objection && r.boxTitle === updated.boxTitle);
+    if (idx === -1) return [...prev, updated];
+    const next = [...prev];
+    next[idx] = updated;
+    return next;
+  });
 
   return (
     <div>
@@ -62,8 +71,10 @@ export default function ObjectionsScreen() {
         <ObjectionModal
           objection={selected}
           feedback={feedback}
+          responses={responses}
           onClose={() => setSelected(null)}
           onFeedbackPosted={onFeedbackPosted}
+          onResponseChanged={onResponseChanged}
         />
       )}
     </div>
