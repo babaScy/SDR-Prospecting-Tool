@@ -16,4 +16,5 @@ module.exports = [
   { email: 'aleksandra@scytale.ai',  role: 'sdr',   regions: ['poland', 'uk'] },
   { email: 'severop@scytale.ai',     role: 'sdr',   regions: ['dach', 'nordics'] },
   { email: 'veronicat@scytale.ai',   role: 'sdr',   regions: ['aus', 'benelux', 'taiwan'] },
+  { email: 'danielp@scytale.ai',     role: 'sdr',   regions: ['dach'] },
 ];
