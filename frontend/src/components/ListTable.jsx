@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchLeads, sendDecision } from '../api';
 import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../icons';
-import { getCompanyHref } from '../utils/companyLink';
+import { getCompanyHref, hasUsableDomain } from '../utils/companyLink';
 import { complianceBadge } from '../utils/compliance';
 import { disagreesWithVerdict } from '../utils/verdict';
 
@@ -158,6 +158,7 @@ export default function ListTable({ listId, onDecision }) {
             {rows.map((lead) => {
               const companyHref = getCompanyHref(lead.website);
               const compliance = complianceBadge(lead.qualification);
+              const noDomain = !hasUsableDomain(lead.website);
               return (
               <tr key={lead._id}>
                 <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
@@ -176,12 +177,18 @@ export default function ListTable({ listId, onDecision }) {
                 <td>
                   {lead.sdrStatus === 'pending' ? (
                     <div className="decision-row" style={{ margin: 0 }}>
-                      <button className="btn accept small" onClick={() => decide(lead, 'accepted')} disabled={busyIds.has(lead._id)}>
+                      <button
+                        className="btn accept small"
+                        onClick={() => decide(lead, 'accepted')}
+                        disabled={busyIds.has(lead._id) || noDomain}
+                        title={noDomain ? 'No domain on Apollo — contacts cannot be sourced' : undefined}
+                      >
                         <IconCheck /> Accept
                       </button>
                       <button className="btn reject small" onClick={() => decide(lead, 'rejected')} disabled={busyIds.has(lead._id)}>
                         <IconX /> Reject
                       </button>
+                      {noDomain && <span className="chip muted">no domain</span>}
                     </div>
                   ) : (
                     <button className="btn ghost small" onClick={() => decide(lead, 'pending')} disabled={busyIds.has(lead._id)}>
@@ -209,6 +216,12 @@ export default function ListTable({ listId, onDecision }) {
               onChange={(e) => setOverrideComment(e.target.value)}
               placeholder="e.g. AI missed that they're a consultancy, not SaaS"
             />
+            {/* The overlay covers the whole page, including the .panel's own
+                {error && ...} above — without this, a failed confirm (e.g. the
+                backend's 409 when a company has no domain) set `error` correctly
+                but the dialog just sat there with no visible feedback, since the
+                text rendered behind it. */}
+            {error && <p className="error">{error}</p>}
             <div className="decision-row">
               <button className="btn ghost" onClick={cancelOverride} disabled={busyIds.has(override.lead._id)}>
                 Cancel
