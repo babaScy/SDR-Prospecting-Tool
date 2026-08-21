@@ -5,13 +5,18 @@ const { REGIONS } = require('../src/config/filters');
 
 const sdrs = USERS.filter((u) => u.role === 'sdr');
 
-test('roster has one admin and 16 SDRs', () => {
+test('roster has one admin and 17 SDRs', () => {
   assert.equal(USERS.filter((u) => u.role === 'admin').length, 1);
-  assert.equal(sdrs.length, 16);
+  assert.equal(sdrs.length, 17);
 });
 
-test('danielp was dropped', () => {
-  assert.equal(USERS.find((u) => u.email === 'danielp@scytale.ai'), undefined);
+// danielp@scytale.ai was dropped from the roster on 2026-07-27 (guarded by a
+// test here ever since) and re-added intentionally on 2026-08-20.
+test('danielp is an SDR in dach', () => {
+  const danielp = USERS.find((u) => u.email === 'danielp@scytale.ai');
+  assert.ok(danielp, 'danielp@scytale.ai should be present');
+  assert.equal(danielp.role, 'sdr');
+  assert.deepEqual(danielp.regions, ['dach']);
 });
 
 test('every email is lowercase', () => {
