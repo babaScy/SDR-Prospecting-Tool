@@ -44,6 +44,13 @@ const COMMON_FILTERS = {
     'software as a service',
     'api integration',
     'workflow automation',
+    // Added 2026-08-21 — DB-correlation-backed on the larger 1317-company
+    // decided set (1.3x-1.6x qualify-rate lift, present on 12%-27% of
+    // qualified companies) and live-tested at 0%-+11% pool-size lift on the
+    // thinnest regions. See docs/superpowers/specs/2026-08-21-expand-net-new-
+    // pools-design.md.
+    'computer systems design and related services',
+    'data analytics',
   ],
   included_organization_keyword_fields: ['tags', 'name'],
   q_not_organization_keyword_tags: [
@@ -81,12 +88,14 @@ const COMMON_FILTERS = {
     'management consulting',
   ],
   excluded_organization_keyword_fields: ['tags', 'name', 'social_media_description'],
-  organization_industry_tag_ids: [
-    '5567cd4773696439b10b0000',
-    '5567cddb7369644d250c0000',
-    '5567cdd67369643e64020000',
-    '5567cd4d736964397e020000',
-  ],
+  // organization_industry_tag_ids (the "must be tagged as IT & services /
+  // health & fitness / financial services / internet" include-restriction)
+  // removed 2026-08-21 — it was the single most restrictive filter in this
+  // config (live-tested at +566% pool lift on benelux/icp2 alone when
+  // removed) and one of its four included industries, "financial services",
+  // independently underperformed the other three by 1.5x-3x. The newly-
+  // admitted companies are unvalidated by the AI qualifier — see monitoring
+  // plan in docs/superpowers/specs/2026-08-21-expand-net-new-pools-design.md.
   organization_not_industry_tag_ids: [
     '5567cd467369644d39040000',
     '5567e09973696410db020800',

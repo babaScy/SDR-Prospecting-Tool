@@ -21,7 +21,32 @@ test('buildSearchBody uses icp2 employee ranges', () => {
 test('buildSearchBody uses icp3 employee ranges', () => {
   const body = buildSearchBody('icp3', 'taiwan', 1, 25);
   assert.deepEqual(body.organization_num_employees_ranges, ['251,500', '501,1000', '1001,5000', '5001,10000', '10001,']);
-  assert.deepEqual(body.organization_locations, ['Taiwan']);
+  assert.deepEqual(body.organization_locations, ['Taiwan', 'Singapore', 'South Korea']);
+});
+
+test('buildSearchBody no longer restricts to the industry include-list', () => {
+  const body = buildSearchBody('icp2', 'benelux', 1, 25);
+  assert.equal('organization_industry_tag_ids' in body, false);
+});
+
+test('buildSearchBody keeps the industry exclude-list untouched', () => {
+  const body = buildSearchBody('icp1', 'uk', 1, 25);
+  assert.deepEqual(body.organization_not_industry_tag_ids, [
+    '5567cd467369644d39040000',
+    '5567e09973696410db020800',
+    '5567cdd47369643dbf260000',
+    '5567cd8e7369645409450000',
+    '5567d1127261697f2b1d0000',
+    '5567ce987369643b789e0000',
+  ]);
+});
+
+test('buildSearchBody includes the two new keyword tags for every profile', () => {
+  for (const profile of ['icp1', 'icp2', 'icp3']) {
+    const body = buildSearchBody(profile, 'nordics', 1, 25);
+    assert.ok(body.q_organization_keyword_tags.includes('computer systems design and related services'), `${profile} missing computer-systems-design keyword`);
+    assert.ok(body.q_organization_keyword_tags.includes('data analytics'), `${profile} missing data-analytics keyword`);
+  }
 });
 
 test('buildSearchBody throws on unknown profile or region', () => {
