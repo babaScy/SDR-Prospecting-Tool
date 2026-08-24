@@ -38,7 +38,11 @@ async function countsByList(listIds) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const filter = req.user.role === 'sdr' ? { assignedTo: req.user.email } : {};
+    // Ownership-scoped for anyone who isn't admin — default-deny rather than
+    // an sdr-specific allowlist, so any future non-admin role (e.g. 'inbound')
+    // is safely restricted by default instead of silently falling through to
+    // unrestricted admin-level access.
+    const filter = req.user.role !== 'admin' ? { assignedTo: req.user.email } : {};
     const lists = await List.find(filter).sort({ createdAt: -1 }).lean();
     const counts = await countsByList(lists.map((l) => l._id));
     res.json(lists.map((l) => ({ ...l, counts: counts.get(String(l._id)) || EMPTY_COUNTS })));
@@ -52,7 +56,7 @@ router.get('/:id', async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'List not found' });
     const list = await List.findById(req.params.id).lean();
     if (!list) return res.status(404).json({ error: 'List not found' });
-    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
     const counts = await countsByList([list._id]);
@@ -71,7 +75,7 @@ router.get('/:id/leads', async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'List not found' });
     const list = await List.findById(req.params.id);
     if (!list) return res.status(404).json({ error: 'List not found' });
-    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
 
@@ -91,7 +95,7 @@ router.post('/:id/confirm-review', async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'List not found' });
     const list = await List.findById(req.params.id);
     if (!list) return res.status(404).json({ error: 'List not found' });
-    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
     if (list.status !== 'reviewed') {
@@ -120,7 +124,7 @@ router.get('/:id/contacts', async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'List not found' });
     const list = await List.findById(req.params.id).lean();
     if (!list) return res.status(404).json({ error: 'List not found' });
-    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
     const companies = await Company.find({ listId: list._id, sdrStatus: 'accepted' })

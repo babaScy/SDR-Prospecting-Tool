@@ -19,7 +19,7 @@ router.post('/:id/decision', async (req, res, next) => {
     if (!existing) return res.status(404).json({ error: 'Lead not found' });
 
     const ownerList = await List.findById(existing.listId);
-    if (req.user.role === 'sdr' && ownerList?.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && ownerList?.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
     if (ownerList?.reviewConfirmedAt) {
@@ -78,7 +78,7 @@ router.post('/:id/hubspot', async (req, res, next) => {
 
     const list = await List.findById(company.listId);
     if (!list) return res.status(404).json({ error: 'List not found' });
-    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
 

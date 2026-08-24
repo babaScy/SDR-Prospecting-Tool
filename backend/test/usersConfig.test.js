@@ -4,10 +4,22 @@ const USERS = require('../src/config/users');
 const { REGIONS } = require('../src/config/filters');
 
 const sdrs = USERS.filter((u) => u.role === 'sdr');
+const inbound = USERS.filter((u) => u.role === 'inbound');
 
-test('roster has one admin and 17 SDRs', () => {
+test('roster has one admin, 17 SDRs, and 2 inbound reps', () => {
   assert.equal(USERS.filter((u) => u.role === 'admin').length, 1);
   assert.equal(sdrs.length, 17);
+  assert.equal(inbound.length, 2);
+  assert.equal(USERS.length, 20);
+});
+
+// Inbound reps get no prospecting access, Objection Handler only — see
+// routes/lists.js, leads.js, contacts.js, which scope non-admins to their own
+// data by email (i.e. none, for a role that never owns a list).
+test('inbound reps are millicentd and ivonne, with no regions', () => {
+  const emails = inbound.map((u) => u.email).sort();
+  assert.deepEqual(emails, ['ivonne@scytale.ai', 'millicentd@scytale.ai']);
+  for (const u of inbound) assert.deepEqual(u.regions, [], `${u.email} should have no regions`);
 });
 
 // danielp@scytale.ai was dropped from the roster on 2026-07-27 (guarded by a

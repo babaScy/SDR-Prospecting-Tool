@@ -17,4 +17,9 @@ module.exports = [
   { email: 'severop@scytale.ai',     role: 'sdr',   regions: ['dach', 'nordics'] },
   { email: 'veronicat@scytale.ai',   role: 'sdr',   regions: ['aus', 'benelux', 'taiwan'] },
   { email: 'danielp@scytale.ai',     role: 'sdr',   regions: ['dach'] },
+  // Inbound reps — no prospecting, Objection Handler access only. No regions
+  // (nothing to be assigned to), and every ownership-scoped route restricts
+  // them to their own data (i.e. none) since they aren't 'admin'.
+  { email: 'millicentd@scytale.ai',  role: 'inbound', regions: [] },
+  { email: 'ivonne@scytale.ai',      role: 'inbound', regions: [] },
 ];

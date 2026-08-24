@@ -12,6 +12,7 @@ import { IconUndo } from './icons';
 import { fetchMe, logout } from './api';
 
 function defaultView(user) {
+  if (user?.role === 'inbound') return { name: 'objections' };
   return { name: user?.role === 'admin' ? 'pull' : 'lists' };
 }
 

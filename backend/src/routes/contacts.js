@@ -18,7 +18,7 @@ router.post('/:id/hubspot', async (req, res, next) => {
 
     const list = await List.findById(contact.listId);
     if (!list) return res.status(404).json({ error: 'List not found' });
-    if (req.user.role === 'sdr' && list.assignedTo !== req.user.email) {
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
       return res.status(403).json({ error: 'Not your list' });
     }
 
