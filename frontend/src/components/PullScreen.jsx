@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { startPull, fetchLists, fetchList, fetchQualificationMode, setQualificationMode as saveQualificationMode } from '../api';
+import {
+  startPull, fetchLists, fetchList,
+  fetchQualificationMode, setQualificationMode as saveQualificationMode,
+  fetchMaintenanceStatus, setMaintenanceMode as saveMaintenanceMode,
+} from '../api';
 import USERS from '../users';
 
 const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan'];
@@ -15,6 +19,8 @@ export default function PullScreen() {
   const [error, setError] = useState('');
   const [qualificationMode, setQualificationModeState] = useState(null);
   const [modeError, setModeError] = useState('');
+  const [maintenanceMode, setMaintenanceModeState] = useState(null);
+  const [maintenanceError, setMaintenanceError] = useState('');
 
   // On mount, pick up a pull that's already running (e.g. after a page refresh).
   useEffect(() => {
@@ -39,6 +45,22 @@ export default function PullScreen() {
       setQualificationModeState(res.mode);
     } catch (err) {
       setModeError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchMaintenanceStatus()
+      .then(({ enabled }) => setMaintenanceModeState(enabled))
+      .catch(() => {});
+  }, []);
+
+  const changeMaintenanceMode = async (enabled) => {
+    setMaintenanceError('');
+    try {
+      const res = await saveMaintenanceMode(enabled);
+      setMaintenanceModeState(res.enabled);
+    } catch (err) {
+      setMaintenanceError(err.message);
     }
   };
 
@@ -83,6 +105,25 @@ export default function PullScreen() {
           </label>
         </div>
         {modeError && <p className="error">{modeError}</p>}
+      </div>
+
+      <div className="panel">
+        <h2>Maintenance mode</h2>
+        <div className="form-row">
+          <label>
+            <input
+              type="checkbox"
+              checked={Boolean(maintenanceMode)}
+              disabled={maintenanceMode === null}
+              onChange={(e) => changeMaintenanceMode(e.target.checked)}
+            />
+            {' '}Show every SDR a "down for maintenance" page instead of the app
+          </label>
+        </div>
+        {maintenanceMode && (
+          <p className="muted">On — only admins can currently reach the app. Turn this off when you're done.</p>
+        )}
+        {maintenanceError && <p className="error">{maintenanceError}</p>}
       </div>
 
       <div className="panel">

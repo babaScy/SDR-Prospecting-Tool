@@ -14,4 +14,20 @@ async function setQualificationMode(mode) {
   await PipelineState.findOneAndUpdate({ key: KEY }, { $set: { value: mode } }, { upsert: true });
 }
 
-module.exports = { getQualificationMode, setQualificationMode, MODES };
+// Planned-maintenance toggle: app and database stay up, this just tells the
+// frontend to show every non-admin a maintenance screen instead of the app.
+// Same PipelineState-backed pattern as qualification mode — instant, no
+// restart needed, and every user's next status check picks it up.
+const MAINTENANCE_KEY = 'maintenanceMode';
+
+async function getMaintenanceMode() {
+  const doc = await PipelineState.findOne({ key: MAINTENANCE_KEY });
+  return doc?.value === true;
+}
+
+async function setMaintenanceMode(enabled) {
+  if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+  await PipelineState.findOneAndUpdate({ key: MAINTENANCE_KEY }, { $set: { value: enabled } }, { upsert: true });
+}
+
+module.exports = { getQualificationMode, setQualificationMode, MODES, getMaintenanceMode, setMaintenanceMode };

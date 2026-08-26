@@ -8,8 +8,9 @@ import ObjectionsScreen from './components/ObjectionsScreen';
 import LoginScreen from './components/LoginScreen';
 import ChangePasswordScreen from './components/ChangePasswordScreen';
 import WolfSplash from './components/WolfSplash';
+import MaintenanceScreen from './components/MaintenanceScreen';
 import { IconUndo } from './icons';
-import { fetchMe, logout } from './api';
+import { fetchMe, logout, fetchMaintenanceStatus } from './api';
 
 function defaultView(user) {
   if (user?.role === 'inbound') return { name: 'objections' };
@@ -24,6 +25,11 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   // Set when the user asks to change a password they already chose.
   const [changing, setChanging] = useState(false);
+  // Planned maintenance: blocks everyone except admin (App.jsx render logic
+  // below), regardless of whether they're signed in yet. Checked alongside
+  // the session so there's no flash of the login form before it kicks in.
+  const [maintenance, setMaintenance] = useState(false);
+  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
 
   const signedIn = (me) => {
     setUser(me);
@@ -50,6 +56,17 @@ export default function App() {
     return () => window.removeEventListener('prospector:unauthorized', onUnauthorized);
   }, []);
 
+  // Fail open (treat as off) if this check itself errors — a broken status
+  // check should never be the thing that locks everyone out of the app.
+  useEffect(() => {
+    let cancelled = false;
+    fetchMaintenanceStatus()
+      .then((res) => { if (!cancelled) setMaintenance(res.enabled); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setMaintenanceChecked(true); });
+    return () => { cancelled = true; };
+  }, []);
+
   const signOut = async () => {
     await logout();
     setUser(null);
@@ -57,7 +74,11 @@ export default function App() {
     setChanging(false);
   };
 
-  if (checking) return <div className="login-wrap" />;
+  if (checking || !maintenanceChecked) return <div className="login-wrap" />;
+  // Blocks the login form too — a signed-out visitor should see this instead
+  // of trying to sign in during planned maintenance. Admin bypasses entirely,
+  // so whoever turned it on can still reach the toggle to turn it back off.
+  if (maintenance && (!user || user.role !== 'admin')) return <MaintenanceScreen />;
   if (!user) return <LoginScreen onSignedIn={signedIn} />;
 
   // An admin-issued password cannot be used to reach the app.

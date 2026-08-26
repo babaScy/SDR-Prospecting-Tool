@@ -50,6 +50,12 @@ export const fetchQualificationMode = () => request('/api/settings/qualification
 export const setQualificationMode = (mode) =>
   request('/api/settings/qualification-mode', { method: 'PUT', body: JSON.stringify({ mode }) });
 
+// Reachable with no session at all — that's the point, a signed-out SDR
+// should see the maintenance screen instead of the login form.
+export const fetchMaintenanceStatus = () => request('/api/maintenance-status');
+export const setMaintenanceMode = (enabled) =>
+  request('/api/settings/maintenance-mode', { method: 'PUT', body: JSON.stringify({ enabled }) });
+
 export const fetchLists = () => request('/api/lists');
 export const fetchList = (id) => request(`/api/lists/${id}`);
 export const fetchLeads = (id, bucket) =>

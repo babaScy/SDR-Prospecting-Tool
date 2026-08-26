@@ -36,3 +36,32 @@ test('PUT /api/settings/qualification-mode rejects an invalid mode', async () =>
   const res = await admin(request(app).put('/api/settings/qualification-mode')).send({ mode: 'bogus' });
   assert.equal(res.status, 400);
 });
+
+test('GET /api/maintenance-status is reachable with no session at all', async () => {
+  const res = await request(app).get('/api/maintenance-status');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.enabled, false);
+});
+
+test('PUT /api/settings/maintenance-mode is admin-only', async () => {
+  const res = await asSdr(request(app).put('/api/settings/maintenance-mode')).send({ enabled: true });
+  assert.equal(res.status, 403);
+});
+
+test('PUT /api/settings/maintenance-mode toggles it, visible on the public status endpoint', async () => {
+  const put = await admin(request(app).put('/api/settings/maintenance-mode')).send({ enabled: true });
+  assert.equal(put.status, 200);
+  assert.equal(put.body.enabled, true);
+
+  const status = await request(app).get('/api/maintenance-status');
+  assert.equal(status.body.enabled, true);
+
+  await admin(request(app).put('/api/settings/maintenance-mode')).send({ enabled: false });
+  const status2 = await request(app).get('/api/maintenance-status');
+  assert.equal(status2.body.enabled, false);
+});
+
+test('PUT /api/settings/maintenance-mode rejects a non-boolean value', async () => {
+  const res = await admin(request(app).put('/api/settings/maintenance-mode')).send({ enabled: 'yes' });
+  assert.equal(res.status, 400);
+});

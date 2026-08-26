@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const currentUser = require('./middleware/currentUser');
+const { getMaintenanceMode } = require('./services/settingsService');
 
 const app = express();
 // credentials must be allowed for the session cookie to travel cross-origin.
@@ -10,6 +11,17 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// Planned-maintenance status has to be reachable with no session at all — the
+// whole point is showing it instead of the login form. Toggling it is
+// admin-only and lives behind the guard, at PUT /api/settings/maintenance-mode.
+app.get('/api/maintenance-status', async (req, res, next) => {
+  try {
+    res.json({ enabled: await getMaintenanceMode() });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Signing in has to be reachable without a session, so this mounts ahead of the guard.
 app.use('/api/auth', require('./routes/auth'));
