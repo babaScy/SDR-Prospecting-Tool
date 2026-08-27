@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const currentUser = require('./middleware/currentUser');
+const maintenanceGuard = require('./middleware/maintenanceGuard');
 const { getMaintenanceMode } = require('./services/settingsService');
 
 const app = express();
@@ -27,6 +28,11 @@ app.get('/api/maintenance-status', async (req, res, next) => {
 app.use('/api/auth', require('./routes/auth'));
 
 app.use('/api', currentUser);
+// Real enforcement, not just the frontend's UI hint — blocks every non-admin
+// API call while maintenance is on, so an already-open tab (or a direct API
+// call) can't bypass it. Mounted globally, ahead of every route below,
+// including settings — admin bypasses it, so the toggle itself stays reachable.
+app.use('/api', maintenanceGuard);
 
 // Routes are mounted as they are built (Tasks 5-6):
 app.use('/api/pull', require('./routes/pull'));
