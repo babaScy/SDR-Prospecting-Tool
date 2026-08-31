@@ -8,13 +8,20 @@
  * changed after the fact (see hubspotGapReport.js for how the gap lists were
  * built).
  *
+ * If company-pre-existing.csv is also present in the directory (companies
+ * hubspotGapReport.js found predate WOLF sourcing them — see predatesWolf),
+ * this also sets wolf_prospect=false on those, correcting any that were
+ * previously mis-tagged by an older run that didn't check dates.
+ *
  * WRITES to HubSpot: creates one property definition per object type (only
- * if missing) and batch-updates wolf_prospect=true on each record in the
- * CSVs. Touches no other property, and creates/deletes/associates nothing.
+ * if missing) and batch-updates wolf_prospect on each record in the CSVs
+ * (true for gaps, false for pre-existing). Touches no other property, and
+ * creates/deletes/associates nothing.
  *
  * Usage: node scripts/tagWolfProspects.js <gapReportDir>
  *   <gapReportDir> must contain company-gaps.csv and contact-gaps.csv, as
  *   written by `node scripts/hubspotGapReport.js --csv <gapReportDir>`.
+ *   company-pre-existing.csv is optional.
  */
 require('dotenv').config();
 const fs = require('fs');
@@ -73,13 +80,13 @@ async function ensureProperty(objectType) {
   console.log(`[${objectType}] created "${PROPERTY_LABEL}" property in group "${GROUP_NAME[objectType]}"`);
 }
 
-async function batchSetTrue(objectType, ids) {
+async function batchSetProperty(objectType, ids, value) {
   for (let i = 0; i < ids.length; i += 100) {
     const chunk = ids.slice(i, i + 100);
     await hubspotService.hsRequest('post', `/crm/v3/objects/${objectType}/batch/update`, {
-      inputs: chunk.map((id) => ({ id, properties: { [PROPERTY_NAME]: 'true' } })),
+      inputs: chunk.map((id) => ({ id, properties: { [PROPERTY_NAME]: value } })),
     });
-    console.log(`[${objectType}] tagged ${Math.min(i + 100, ids.length)}/${ids.length}`);
+    console.log(`[${objectType}] set ${PROPERTY_NAME}=${value} on ${Math.min(i + 100, ids.length)}/${ids.length}`);
   }
 }
 
@@ -98,7 +105,7 @@ async function main() {
   const contacts = parseCsv(path.join(dir, 'contact-gaps.csv'));
   if (contactsOnly) {
     console.log(`\nTagging ${contacts.length} contacts as "${PROPERTY_LABEL}" (companies skipped — --contacts-only)...`);
-    await batchSetTrue('contacts', contacts.map((c) => c[ID_COLUMN.contacts]));
+    await batchSetProperty('contacts', contacts.map((c) => c[ID_COLUMN.contacts]), 'true');
     console.log('\nDone.');
     return;
   }
@@ -106,10 +113,23 @@ async function main() {
   const companies = parseCsv(path.join(dir, 'company-gaps.csv'));
   console.log(`\nTagging ${companies.length} companies and ${contacts.length} contacts as "${PROPERTY_LABEL}"...`);
 
-  await batchSetTrue('companies', companies.map((c) => c[ID_COLUMN.companies]));
-  await batchSetTrue('contacts', contacts.map((c) => c[ID_COLUMN.contacts]));
+  await batchSetProperty('companies', companies.map((c) => c[ID_COLUMN.companies]), 'true');
+  await batchSetProperty('contacts', contacts.map((c) => c[ID_COLUMN.contacts]), 'true');
+
+  const preExistingPath = path.join(dir, 'company-pre-existing.csv');
+  if (fs.existsSync(preExistingPath)) {
+    const preExisting = parseCsv(preExistingPath);
+    if (preExisting.length) {
+      console.log(`\nCorrecting ${preExisting.length} companies that predate WOLF sourcing them (unsetting "${PROPERTY_LABEL}")...`);
+      await batchSetProperty('companies', preExisting.map((c) => c[ID_COLUMN.companies]), 'false');
+    }
+  }
 
   console.log('\nDone.');
 }
 
-main().catch((err) => { console.error(err); process.exitCode = 1; });
+module.exports = { parseCsv };
+
+if (require.main === module) {
+  main().catch((err) => { console.error(err); process.exitCode = 1; });
+}

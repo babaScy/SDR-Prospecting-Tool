@@ -9,9 +9,19 @@
  * were never meant to reach HubSpot, so their HubSpot presence (if any)
  * isn't a gap worth reporting.
  *
+ * Policy: a company found live in HubSpot only counts as a genuine WOLF gap
+ * (tag-eligible) if it appeared in HubSpot at or after the moment Prospector
+ * pulled it (see predatesWolf). If the HubSpot record predates that pull, it
+ * was already a real CRM company before WOLF ever touched it — filed under
+ * companyPreExisting instead, and never tagged. A createdate that can't be
+ * compared goes to companyDateUnknown for manual review.
+ *
  * For each accepted company:
- *   - contactStatus 'pending'/'sourcing' → sourcing isn't done yet, skipped
- *     (counted separately so it isn't silently dropped).
+ *   - contactStatus 'pending'/'sourcing' → contact sourcing isn't done yet
+ *     (no Contact docs to check below, tracked via stillSourcing), but the
+ *     company itself can still independently exist in HubSpot (e.g. via
+ *     HubSpot's own Apollo integration) — so it still gets the full
+ *     company-level check below, same as any other accepted company.
  *   - company-level: hubspotCompanyId set → NOT automatically "known". Our
  *     own resolveOrCreateCompany() searches HubSpot by domain first and just
  *     reuses/associates to a match if one exists — it only creates a company
@@ -124,6 +134,20 @@ function classifyLookupResult(hit) {
   return { bucket: 'gap', reason: 'found-live', hubspotId: hit.id, matchedOn: hit.matchedOn };
 }
 
+// Policy: a company found live in HubSpot only counts as a genuine WOLF gap
+// (and gets wolf_prospect tagged) if it showed up in HubSpot at or after the
+// moment Prospector pulled it. If the HubSpot record predates that pull, it
+// was already a real CRM company before WOLF ever touched it — not a WOLF
+// find — so it's excluded rather than tagged. Returns null (not a guess)
+// when either date can't be parsed, so the caller can route it to manual
+// review instead of silently deciding either way.
+function predatesWolf(hubspotCreatedAt, prospectorCreatedAt) {
+  const hs = new Date(hubspotCreatedAt).getTime();
+  const pros = new Date(prospectorCreatedAt).getTime();
+  if (Number.isNaN(hs) || Number.isNaN(pros)) return null;
+  return hs < pros;
+}
+
 module.exports = {
   classifyContactRecord,
   classifyCompanyRecord,
@@ -132,6 +156,7 @@ module.exports = {
   classifyAssociatedContactSources,
   isNotFoundError,
   classifyLookupResult,
+  predatesWolf,
 };
 
 // ─── CSV export (optional, only when --csv <outDir> is passed) ──────────────
@@ -182,6 +207,8 @@ async function main() {
   const r = {
     stillSourcing: 0,
     companyGaps: [],
+    companyPreExisting: [], // found live in HubSpot, but predates WOLF sourcing it — not tagged
+    companyDateUnknown: [], // found live, but a createdate couldn't be compared — needs manual review
     companyAmbiguous: [],
     companyErrors: [],
     companyClean: 0,
@@ -196,10 +223,25 @@ async function main() {
     contactStale: 0,
   };
 
+  // Given a confirmed company-level HubSpot match, decide whether it's a
+  // genuine WOLF gap (tag-eligible) or predates WOLF sourcing it (excluded
+  // per policy — see predatesWolf) and file it into the right result bucket.
+  function fileCompanyGap({ company, hubspotCompanyId, reason, sdr, hubspotCreatedAt }) {
+    const entry = { company: company.companyName, domain: company.website, reason, hubspotCompanyId, sdr };
+    const predates = predatesWolf(hubspotCreatedAt, company.createdAt);
+    if (predates === true) r.companyPreExisting.push(entry);
+    else if (predates === false) r.companyGaps.push(entry);
+    else r.companyDateUnknown.push(entry);
+  }
+
   for (const company of companies) {
+    // Contact sourcing not done yet — no Contact docs to check below — but
+    // the company itself can still independently exist in HubSpot (e.g. via
+    // HubSpot's own Apollo integration), so it still needs the company-level
+    // check. stillSourcing is tracked for visibility only, it no longer
+    // skips the company-level check.
     if (company.contactStatus === 'pending' || company.contactStatus === 'sourcing') {
       r.stillSourcing++;
-      continue;
     }
     const sdr = sdrByListId.get(company.listId?.toString()) || 'unknown';
 
@@ -214,7 +256,10 @@ async function main() {
         const hit = await hubspotService.findCompanyByDomain(company.website);
         const outcome = classifyLookupResult(hit);
         if (outcome.bucket === 'gap') {
-          r.companyGaps.push({ company: company.companyName, domain: company.website, reason: 'found-live', hubspotCompanyId: outcome.hubspotId, sdr });
+          // findCompanyByDomain only returns the id — fetch the record's own
+          // createdAt so fileCompanyGap can check it against WOLF's pull time.
+          const rec = await hubspotService.hsRequest('get', `/crm/v3/objects/companies/${outcome.hubspotId}`);
+          fileCompanyGap({ company, hubspotCompanyId: outcome.hubspotId, reason: 'found-live', sdr, hubspotCreatedAt: rec.data.createdAt });
         } else if (outcome.bucket === 'ambiguous') {
           r.companyAmbiguous.push({ company: company.companyName, domain: company.website, matches: outcome.count });
         } else {
@@ -246,7 +291,7 @@ async function main() {
           outcome = classifyAssociatedContactSources(sources);
         }
         if (outcome.bucket === 'gap') {
-          r.companyGaps.push({ company: company.companyName, domain: company.website, reason: outcome.reason, hubspotCompanyId: survivingId, sdr });
+          fileCompanyGap({ company, hubspotCompanyId: survivingId, reason: outcome.reason, sdr, hubspotCreatedAt: rec.data.createdAt });
         } else {
           r.companyVerifiedWolf++; // genuinely created by our own push — distinct from companyClean (not in HubSpot at all)
         }
@@ -296,10 +341,10 @@ async function main() {
   }
 
   console.log(`\n=== HubSpot gap report — ${companies.length} accepted companies (as of now)${contactsOnly ? ' — contacts only, company-level checks skipped' : ''} ===`);
-  console.log(`${r.stillSourcing} still sourcing (skipped)\n`);
+  console.log(`${r.stillSourcing} still sourcing contacts (company-level checked anyway)\n`);
 
   if (!contactsOnly) {
-    console.log(`=== COMPANY GAPS: ${r.companyGaps.length} in HubSpot, not pushed via Prospector ===`);
+    console.log(`=== COMPANY GAPS: ${r.companyGaps.length} in HubSpot, not pushed via Prospector — tag-eligible ===`);
     printTable(r.companyGaps, [
       { key: 'company', header: 'COMPANY' },
       { key: 'domain', header: 'DOMAIN' },
@@ -307,6 +352,28 @@ async function main() {
       { key: 'hubspotCompanyId', header: 'HUBSPOT ID' },
     ]);
     console.log(`(${r.companyVerifiedWolf} verified genuinely created by Prospector, ${r.companyClean} clean / not in HubSpot, ${r.companyNotCheckable} not checkable — no domain)\n`);
+
+    if (r.companyPreExisting.length) {
+      console.log(`=== COMPANY PRE-EXISTING (found live, but predates WOLF sourcing it — NOT tagged): ${r.companyPreExisting.length} ===`);
+      printTable(r.companyPreExisting, [
+        { key: 'company', header: 'COMPANY' },
+        { key: 'domain', header: 'DOMAIN' },
+        { key: 'reason', header: 'REASON' },
+        { key: 'hubspotCompanyId', header: 'HUBSPOT ID' },
+      ]);
+      console.log('');
+    }
+
+    if (r.companyDateUnknown.length) {
+      console.log(`=== COMPANY DATE UNKNOWN (needs manual review — createdate couldn't be compared): ${r.companyDateUnknown.length} ===`);
+      printTable(r.companyDateUnknown, [
+        { key: 'company', header: 'COMPANY' },
+        { key: 'domain', header: 'DOMAIN' },
+        { key: 'reason', header: 'REASON' },
+        { key: 'hubspotCompanyId', header: 'HUBSPOT ID' },
+      ]);
+      console.log('');
+    }
 
     if (r.companyAmbiguous.length) {
       console.log(`=== COMPANY AMBIGUOUS (needs manual review): ${r.companyAmbiguous.length} ===`);
@@ -385,6 +452,25 @@ async function main() {
           { key: 'matches', header: 'Matching HubSpot companies' },
           { key: 'hubspotUrl', header: 'HubSpot Search Link' },
         ]
+      );
+
+      const companyGapColumns = [
+        { key: 'company', header: 'Company' },
+        { key: 'domain', header: 'Domain' },
+        { key: 'reason', header: 'Reason' },
+        { key: 'sdr', header: 'SDR' },
+        { key: 'hubspotCompanyId', header: 'HubSpot Company ID' },
+        { key: 'hubspotUrl', header: 'HubSpot Link' },
+      ];
+      writeCsv(
+        path.join(csvOutDir, 'company-pre-existing.csv'),
+        r.companyPreExisting.map((g) => ({ ...g, hubspotUrl: companyRecordUrl(portalId, g.hubspotCompanyId) })),
+        companyGapColumns
+      );
+      writeCsv(
+        path.join(csvOutDir, 'company-date-unknown.csv'),
+        r.companyDateUnknown.map((g) => ({ ...g, hubspotUrl: companyRecordUrl(portalId, g.hubspotCompanyId) })),
+        companyGapColumns
       );
     }
 

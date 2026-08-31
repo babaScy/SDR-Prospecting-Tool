@@ -8,6 +8,7 @@ const {
   classifyAssociatedContactSources,
   isNotFoundError,
   classifyLookupResult,
+  predatesWolf,
 } = require('../scripts/hubspotGapReport');
 
 // ─── classifyContactRecord ───────────────────────────────────────────────
@@ -116,4 +117,23 @@ test('classifyLookupResult: a clean single match is a gap', () => {
     classifyLookupResult({ id: 'hs789', matchedOn: 'email' }),
     { bucket: 'gap', reason: 'found-live', hubspotId: 'hs789', matchedOn: 'email' }
   );
+});
+
+// ─── predatesWolf ─────────────────────────────────────────────────────────
+// Policy: a company found live in HubSpot is only a genuine WOLF gap if it
+// showed up in HubSpot *because of* (or after) WOLF sourcing it. If the
+// HubSpot record already existed before Prospector ever pulled the company,
+// it was a pre-existing CRM record, not a WOLF find — exclude it.
+test('predatesWolf: HubSpot record created before Prospector pulled it → predates', () => {
+  assert.equal(predatesWolf('2026-01-01T00:00:00.000Z', '2026-08-12T11:40:27.647Z'), true);
+});
+
+test('predatesWolf: HubSpot record created after Prospector pulled it → does not predate', () => {
+  assert.equal(predatesWolf('2026-08-12T11:45:36.333Z', '2026-08-12T11:40:27.647Z'), false);
+});
+
+test('predatesWolf: unparseable/missing dates → unknown (null), not guessed', () => {
+  assert.equal(predatesWolf(undefined, '2026-08-12T11:40:27.647Z'), null);
+  assert.equal(predatesWolf('2026-08-12T11:45:36.333Z', undefined), null);
+  assert.equal(predatesWolf('not-a-date', '2026-08-12T11:40:27.647Z'), null);
 });
