@@ -65,3 +65,33 @@ test('PUT /api/settings/maintenance-mode rejects a non-boolean value', async () 
   const res = await admin(request(app).put('/api/settings/maintenance-mode')).send({ enabled: 'yes' });
   assert.equal(res.status, 400);
 });
+
+test('GET /api/settings/funnel-stats defaults to all zero, any signed-in user', async () => {
+  const res = await asSdr(request(app).get('/api/settings/funnel-stats'));
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { demosBooked: 0, sqls: 0, closedWon: 0, closedWonRevenue: 0 });
+});
+
+test('PUT /api/settings/funnel-stats is admin-only', async () => {
+  const res = await asSdr(request(app).put('/api/settings/funnel-stats')).send({ demosBooked: 5, sqls: 1, closedWon: 1, closedWonRevenue: 10800 });
+  assert.equal(res.status, 403);
+});
+
+test('PUT /api/settings/funnel-stats updates the stats as admin', async () => {
+  const put = await admin(request(app).put('/api/settings/funnel-stats')).send({ demosBooked: 5, sqls: 1, closedWon: 1, closedWonRevenue: 10800 });
+  assert.equal(put.status, 200);
+  assert.deepEqual(put.body, { demosBooked: 5, sqls: 1, closedWon: 1, closedWonRevenue: 10800 });
+
+  const get = await asSdr(request(app).get('/api/settings/funnel-stats'));
+  assert.deepEqual(get.body, { demosBooked: 5, sqls: 1, closedWon: 1, closedWonRevenue: 10800 });
+});
+
+test('PUT /api/settings/funnel-stats rejects a negative number', async () => {
+  const res = await admin(request(app).put('/api/settings/funnel-stats')).send({ demosBooked: -1, sqls: 1, closedWon: 1, closedWonRevenue: 0 });
+  assert.equal(res.status, 400);
+});
+
+test('PUT /api/settings/funnel-stats rejects a non-numeric value', async () => {
+  const res = await admin(request(app).put('/api/settings/funnel-stats')).send({ demosBooked: 'five', sqls: 1, closedWon: 1, closedWonRevenue: 0 });
+  assert.equal(res.status, 400);
+});

@@ -1,5 +1,12 @@
 const express = require('express');
-const { getQualificationMode, setQualificationMode, MODES, setMaintenanceMode } = require('../services/settingsService');
+const {
+  getQualificationMode,
+  setQualificationMode,
+  MODES,
+  setMaintenanceMode,
+  getFunnelStats,
+  setFunnelStats,
+} = require('../services/settingsService');
 
 const router = express.Router();
 
@@ -32,6 +39,33 @@ router.put('/maintenance-mode', async (req, res, next) => {
   try {
     await setMaintenanceMode(enabled);
     res.json({ enabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const FUNNEL_STATS_FIELDS = ['demosBooked', 'sqls', 'closedWon', 'closedWonRevenue'];
+
+router.get('/funnel-stats', async (req, res, next) => {
+  try {
+    res.json(await getFunnelStats());
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/funnel-stats', async (req, res, next) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const body = req.body || {};
+  for (const field of FUNNEL_STATS_FIELDS) {
+    const value = body[field];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      return res.status(400).json({ error: `${field} must be a non-negative number` });
+    }
+  }
+  try {
+    await setFunnelStats(body);
+    res.json(await getFunnelStats());
   } catch (err) {
     next(err);
   }

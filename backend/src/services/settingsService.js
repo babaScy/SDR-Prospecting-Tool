@@ -30,4 +30,37 @@ async function setMaintenanceMode(enabled) {
   await PipelineState.findOneAndUpdate({ key: MAINTENANCE_KEY }, { $set: { value: enabled } }, { upsert: true });
 }
 
-module.exports = { getQualificationMode, setQualificationMode, MODES, getMaintenanceMode, setMaintenanceMode };
+// Funnel stats shown on ListsScreen (demos booked, SQLs, closed-won deals,
+// closed-won revenue). Admin-entered — Prospector has no downstream HubSpot
+// deal-pipeline data of its own to compute these from. Same PipelineState-
+// backed pattern as the settings above.
+const FUNNEL_STATS_KEY = 'funnelStats';
+const FUNNEL_STATS_FIELDS = ['demosBooked', 'sqls', 'closedWon', 'closedWonRevenue'];
+const DEFAULT_FUNNEL_STATS = { demosBooked: 0, sqls: 0, closedWon: 0, closedWonRevenue: 0 };
+
+async function getFunnelStats() {
+  const doc = await PipelineState.findOne({ key: FUNNEL_STATS_KEY });
+  return doc?.value ? { ...DEFAULT_FUNNEL_STATS, ...doc.value } : { ...DEFAULT_FUNNEL_STATS };
+}
+
+async function setFunnelStats(stats) {
+  const next = {};
+  for (const field of FUNNEL_STATS_FIELDS) {
+    const value = stats?.[field];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(`${field} must be a non-negative number`);
+    }
+    next[field] = value;
+  }
+  await PipelineState.findOneAndUpdate({ key: FUNNEL_STATS_KEY }, { $set: { value: next } }, { upsert: true });
+}
+
+module.exports = {
+  getQualificationMode,
+  setQualificationMode,
+  MODES,
+  getMaintenanceMode,
+  setMaintenanceMode,
+  getFunnelStats,
+  setFunnelStats,
+};

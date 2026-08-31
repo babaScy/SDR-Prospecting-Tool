@@ -56,6 +56,10 @@ export const fetchMaintenanceStatus = () => request('/api/maintenance-status');
 export const setMaintenanceMode = (enabled) =>
   request('/api/settings/maintenance-mode', { method: 'PUT', body: JSON.stringify({ enabled }) });
 
+export const fetchFunnelStats = () => request('/api/settings/funnel-stats');
+export const setFunnelStats = (stats) =>
+  request('/api/settings/funnel-stats', { method: 'PUT', body: JSON.stringify(stats) });
+
 export const fetchLists = () => request('/api/lists');
 export const fetchList = (id) => request(`/api/lists/${id}`);
 export const fetchLeads = (id, bucket) =>
