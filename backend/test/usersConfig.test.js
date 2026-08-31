@@ -6,11 +6,11 @@ const { REGIONS } = require('../src/config/filters');
 const sdrs = USERS.filter((u) => u.role === 'sdr');
 const inbound = USERS.filter((u) => u.role === 'inbound');
 
-test('roster has one admin, 17 SDRs, and 2 inbound reps', () => {
+test('roster has one admin, 18 SDRs, and 2 inbound reps', () => {
   assert.equal(USERS.filter((u) => u.role === 'admin').length, 1);
-  assert.equal(sdrs.length, 17);
+  assert.equal(sdrs.length, 18);
   assert.equal(inbound.length, 2);
-  assert.equal(USERS.length, 20);
+  assert.equal(USERS.length, 21);
 });
 
 // Inbound reps get no prospecting access, Objection Handler only — see
@@ -31,6 +31,13 @@ test('danielp is an SDR in dach', () => {
   assert.deepEqual(danielp.regions, ['dach']);
 });
 
+test('sandilen is an SDR in uk and aus', () => {
+  const sandilen = USERS.find((u) => u.email === 'sandilen@scytale.ai');
+  assert.ok(sandilen, 'sandilen@scytale.ai should be present');
+  assert.equal(sandilen.role, 'sdr');
+  assert.deepEqual(sandilen.regions, ['uk', 'aus']);
+});
+
 test('every email is lowercase', () => {
   for (const u of USERS) assert.equal(u.email, u.email.toLowerCase(), u.email);
 });
@@ -46,7 +53,7 @@ test('every SDR has at least one valid region; admin has none', () => {
 
 test('aus roster is correct', () => {
   const aus = sdrs.filter((u) => u.regions.includes('aus')).map((u) => u.email).sort();
-  assert.deepEqual(aus, ['darrent@scytale.ai', 'katiem@scytale.ai', 'simonn@scytale.ai', 'veronicat@scytale.ai']);
+  assert.deepEqual(aus, ['darrent@scytale.ai', 'katiem@scytale.ai', 'sandilen@scytale.ai', 'simonn@scytale.ai', 'veronicat@scytale.ai']);
 });
 
 test('taiwan roster is correct', () => {

@@ -22,4 +22,5 @@ module.exports = [
   // them to their own data (i.e. none) since they aren't 'admin'.
   { email: 'millicentd@scytale.ai',  role: 'inbound', regions: [] },
   { email: 'ivonne@scytale.ai',      role: 'inbound', regions: [] },
+  { email: 'sandilen@scytale.ai',    role: 'sdr',   regions: ['uk', 'aus'] },
 ];
