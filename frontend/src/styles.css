@@ -36,6 +36,7 @@
 
   /* ── Gradients, glows, shape, motion ──────────────────────────────────── */
   --grad-brand: linear-gradient(135deg, rgb(97, 98, 245) 0%, rgb(221, 61, 115) 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(97, 98, 245, 0.15) 0%, rgba(221, 61, 115, 0.1) 100%);
   --grad-sheen: linear-gradient(100deg, rgba(0, 0, 0, 0) 40%, rgba(255, 255, 255, 0.4) 50%, rgba(0, 0, 0, 0) 60%);
   --grad-divider: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgb(97, 98, 245) 33%, rgb(221, 61, 115) 67%, rgba(0, 0, 0, 0) 100%);
   --glow-indigo-sm: 0 0 8px rgba(97, 98, 245, 0.5);
@@ -653,3 +654,30 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 }
 .app-switcher-item:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
 .app-switcher-item.active { color: var(--scy-indigo-200); background: rgba(97, 98, 245, 0.12); }
+
+/* ── Intelligence: search + card feed ───────────────────────────────────── */
+.intel-list { display: flex; flex-direction: column; gap: 14px; }
+.intel-card {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;
+  transition: border-color var(--dur-fast);
+}
+.intel-card:hover { border-color: var(--border-brand); }
+.intel-card-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.intel-kicker {
+  color: var(--muted); font-weight: 700; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.14em;
+}
+.intel-card-body { margin: 0; font-size: 14.5px; color: var(--text); line-height: 1.7; }
+.intel-callout {
+  background: var(--grad-brand-soft); border: 1px solid var(--border-brand);
+  border-radius: var(--radius-sm); padding: 12px 16px;
+}
+.intel-callout-label {
+  display: block; margin-bottom: 5px; color: var(--scy-indigo-200); font-weight: 700;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.18em;
+}
+.intel-callout p { margin: 0; color: var(--text); font-size: 14.5px; line-height: 1.6; }
+.intel-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.intel-card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); line-height: 1.5; }
+.intel-card-foot .company-link { font-weight: 600; }

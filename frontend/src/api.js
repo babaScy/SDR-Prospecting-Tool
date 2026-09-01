@@ -84,6 +84,8 @@ export const postObjectionFeedback = (objection, text) =>
 
 export const fetchObjectionResponses = () => request('/api/objection-responses');
 
+export const fetchIntelEvents = () => request('/api/intel');
+
 export const starObjectionResponse = (objection, boxTitle) =>
   request('/api/objection-responses/star', { method: 'POST', body: JSON.stringify({ objection, boxTitle }) });
 

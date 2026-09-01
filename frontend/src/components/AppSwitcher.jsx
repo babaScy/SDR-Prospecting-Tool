@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 const SECTIONS = [
   { key: 'prospector', label: 'Prospector' },
   { key: 'objections', label: 'Objection Handler' },
+  { key: 'intelligence', label: 'Intelligence' },
 ];
 
 export default function AppSwitcher({ current, onSelect }) {

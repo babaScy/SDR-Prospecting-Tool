@@ -5,6 +5,7 @@ import ListsScreen from './components/ListsScreen';
 import ListDetailScreen from './components/ListDetailScreen';
 import AppSwitcher from './components/AppSwitcher';
 import ObjectionsScreen from './components/ObjectionsScreen';
+import IntelligenceScreen from './components/IntelligenceScreen';
 import LoginScreen from './components/LoginScreen';
 import ChangePasswordScreen from './components/ChangePasswordScreen';
 import WolfSplash from './components/WolfSplash';
@@ -108,12 +109,15 @@ export default function App() {
           <img className="wordmark-logo" src="/sales-logo-light.svg" alt="Scytale Sales" />
           <span className="wordmark-rule" />
           <AppSwitcher
-            current={view.name === 'objections' ? 'objections' : 'prospector'}
-            onSelect={(key) => setView(key === 'objections' ? { name: 'objections' } : defaultView(user))}
+            current={view.name === 'objections' || view.name === 'intelligence' ? view.name : 'prospector'}
+            onSelect={(key) => {
+              if (key === 'objections' || key === 'intelligence') return setView({ name: key });
+              return setView(defaultView(user));
+            }}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          {view.name !== 'objections' && (
+          {view.name !== 'objections' && view.name !== 'intelligence' && (
             <nav>
               <button className={view.name === 'pull' ? 'active' : ''} onClick={() => setView({ name: 'pull' })}>
                 Pull
@@ -148,6 +152,7 @@ export default function App() {
         )}
         {view.name === 'list' && <ListDetailScreen listId={view.listId} onBack={() => setView({ name: 'lists' })} />}
         {view.name === 'objections' && <ObjectionsScreen />}
+        {view.name === 'intelligence' && <IntelligenceScreen />}
       </main>
     </div>
   );

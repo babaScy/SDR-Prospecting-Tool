@@ -8,7 +8,9 @@ const { getMaintenanceMode } = require('./services/settingsService');
 const app = express();
 // credentials must be allowed for the session cookie to travel cross-origin.
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5174', credentials: true }));
-app.use(express.json());
+// Default 100kb is too small for /api/intel/sync, which POSTs framework-intel's
+// whole events log in one call (already >100kb and growing every pipeline run).
+app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -42,6 +44,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/contacts', require('./routes/contacts'));
 app.use('/api/objection-feedback', require('./routes/objectionFeedback'));
 app.use('/api/objection-responses', require('./routes/objectionResponses'));
+app.use('/api/intel', require('./routes/intel'));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
