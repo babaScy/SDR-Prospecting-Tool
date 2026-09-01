@@ -53,6 +53,17 @@ const formatDate = (iso) =>
 
 const byRecent = (a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt);
 
+// The classifier's Claude-generated text (whatsHappening/talkingPoint/
+// whoToTarget) leans on em dashes as a clause separator, which reads as a
+// run-on on a card. Broken into line breaks here, at render time, rather
+// than in framework-intel's classifier — so this holds for every event
+// already synced *and* every future sync, with nothing to remember to do
+// on that side.
+function withLineBreaks(text) {
+  const parts = String(text || '').split('—').map((p) => p.trim()).filter(Boolean);
+  return parts.flatMap((part, i) => (i === 0 ? [part] : [<br key={`br-${i}`} />, part]));
+}
+
 function IntelCard({ event }) {
   const confirmed = event.tier === 'primary';
   return (
@@ -66,12 +77,12 @@ function IntelCard({ event }) {
         ))}
       </div>
 
-      <p className="intel-card-body">{event.whatsHappening}</p>
+      <p className="intel-card-body">{withLineBreaks(event.whatsHappening)}</p>
 
       {event.outreachWorthy && event.whoToTarget && (
         <div className="intel-callout">
           <span className="intel-callout-label">Talking point</span>
-          <p>{event.whoToTarget} — “{event.talkingPoint}”</p>
+          <p>{withLineBreaks(`${event.whoToTarget} — “${event.talkingPoint}”`)}</p>
         </div>
       )}
 
