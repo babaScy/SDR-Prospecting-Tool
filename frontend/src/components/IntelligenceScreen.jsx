@@ -59,10 +59,10 @@ function IntelCard({ event }) {
     <div className="intel-card">
       <div className="intel-card-tags">
         {event.frameworks.map((f) => (
-          <span className="chip" key={f}>{frameworkLabel(f)}</span>
+          <span className="chip chip-framework" key={f}>{frameworkLabel(f)}</span>
         ))}
         {event.regions.map((r) => (
-          <span className="chip" key={r}>{regionLabel(r)}</span>
+          <span className="chip chip-region" key={r}>{regionLabel(r)}</span>
         ))}
       </div>
 
@@ -100,6 +100,7 @@ export default function IntelligenceScreen() {
   const [search, setSearch] = useState('');
   const [frameworkFilter, setFrameworkFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
+  const [tierFilter, setTierFilter] = useState('');
 
   useEffect(() => {
     fetchIntelEvents().then(setEvents).catch((e) => setError(e.message));
@@ -127,7 +128,8 @@ export default function IntelligenceScreen() {
     (e) =>
       matchesSearch(e) &&
       (!frameworkFilter || e.frameworks.includes(frameworkFilter)) &&
-      (!regionFilter || e.regions.includes(regionFilter))
+      (!regionFilter || e.regions.includes(regionFilter)) &&
+      (!tierFilter || e.tier === tierFilter)
   );
   const outreachCount = filtered.filter((e) => e.outreachWorthy).length;
   const frameworkCount = new Set(filtered.flatMap((e) => e.frameworks)).size;
@@ -195,6 +197,14 @@ export default function IntelligenceScreen() {
             <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
               <option value="">All</option>
               {allRegions.map((r) => <option key={r} value={r}>{regionLabel(r)}</option>)}
+            </select>
+          </label>
+          <label>
+            Status
+            <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}>
+              <option value="">All</option>
+              <option value="primary">Confirmed</option>
+              <option value="watch">Unconfirmed</option>
             </select>
           </label>
         </div>

@@ -679,5 +679,9 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 }
 .intel-callout p { margin: 0; color: var(--text); font-size: 14.5px; line-height: 1.6; }
 .intel-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.chip-framework { background: rgba(97, 98, 245, 0.14); color: var(--scy-indigo-200); border-color: rgba(97, 98, 245, 0.35); }
+.chip.chip-framework:hover { background: rgba(97, 98, 245, 0.22); }
+.chip.chip-region { background: rgba(95, 201, 225, 0.12); color: var(--scy-cyan); border-color: rgba(95, 201, 225, 0.32); }
+.chip.chip-region:hover { background: rgba(95, 201, 225, 0.2); }
 .intel-card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); line-height: 1.5; }
 .intel-card-foot .company-link { font-weight: 600; }
