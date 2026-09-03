@@ -76,6 +76,19 @@ router.post('/:id/decision', async (req, res, next) => {
 // one call, instead of one-at-a-time via /:id/decision. Reject-only (no bulk
 // accept) — accept still needs the per-company no-domain check, which reads
 // oddly as a silent bulk skip; one-at-a-time stays the way to accept.
+//
+// KNOWN GAP (deferred 2026-09-03, flagged, ok'd to leave for now): unlike
+// /:id/decision, this never touches sdrComment. /:id/decision's frontend
+// flow treats rejecting an AI-`qualified` company as disagreeing with the
+// verdict (disagreesWithVerdict) and prompts for an optional comment before
+// submitting; bulk-reject has no such check and silently overrides the AI
+// on any selected pending row, `qualified` included, with no comment
+// captured. Doesn't crash — Company.updateMany here only filters on
+// sdrStatus: 'pending', never reads AI status — it just loses that signal
+// for bulk-rejected companies. If revisited: exclude status: 'qualified'
+// from bulk selection (frontend) and from this updateMany filter (backend,
+// so a direct API call can't bypass it either), forcing overrides of a
+// `qualified` verdict through the one-at-a-time flow that captures why.
 router.post('/bulk-reject', async (req, res, next) => {
   try {
     const { listId, ids } = req.body || {};

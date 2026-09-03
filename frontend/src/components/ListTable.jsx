@@ -69,6 +69,12 @@ export default function ListTable({ listId, onDecision }) {
   // hold ids the SDR can no longer see.
   useEffect(() => setSelected(new Set()), [verdictFilter, sdrFilter]);
 
+  // KNOWN GAP (deferred 2026-09-03, ok'd to leave for now): this selects any
+  // pending row regardless of AI verdict, including `status === 'qualified'`
+  // ones. decide() below treats rejecting a qualified row as disagreeing
+  // with the AI (disagreesWithVerdict) and opens an override panel to
+  // optionally capture why; bulk reject has no equivalent — see the same
+  // note on POST /api/leads/bulk-reject in the backend for the fix.
   const pendingRows = useMemo(() => rows.filter((l) => l.sdrStatus === 'pending'), [rows]);
   const allSelected = pendingRows.length > 0 && pendingRows.every((l) => selected.has(l._id));
 
