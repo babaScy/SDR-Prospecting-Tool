@@ -144,6 +144,15 @@ h2 { font-size: 26px; margin: 0 0 12px; }
 .form-row input:focus, .form-row select:focus, .login-panel input:focus {
   outline: none; border-color: var(--primary); box-shadow: var(--glow-indigo-sm);
 }
+/* The open dropdown list is painted by the OS, not the page, so it can't sit
+   on the app's dark background the way the closed <select> does. --panel-2
+   is translucent, so on some machines (seen on SDR laptops, Windows Chrome)
+   the OS backs the popup with opaque white instead — leaving --text's
+   near-white text invisible on it. Options need an explicit *opaque*
+   background of their own. */
+.form-row select option {
+  background: var(--bg); color: var(--text);
+}
 
 /* ── Buttons (Scytale: pill, gradient primary with sheen sweep) ─────────── */
 .btn {
