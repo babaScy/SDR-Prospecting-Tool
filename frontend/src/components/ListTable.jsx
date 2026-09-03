@@ -201,6 +201,7 @@ export default function ListTable({ listId, onDecision }) {
               <th>
                 <input
                   type="checkbox"
+                  className="checkbox-themed"
                   checked={allSelected}
                   onChange={toggleSelectAll}
                   disabled={!pendingRows.length}
@@ -236,7 +237,12 @@ export default function ListTable({ listId, onDecision }) {
               <tr key={lead._id}>
                 <td>
                   {lead.sdrStatus === 'pending' && (
-                    <input type="checkbox" checked={selected.has(lead._id)} onChange={() => toggleRow(lead._id)} />
+                    <input
+                      type="checkbox"
+                      className="checkbox-themed"
+                      checked={selected.has(lead._id)}
+                      onChange={() => toggleRow(lead._id)}
+                    />
                   )}
                 </td>
                 <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
