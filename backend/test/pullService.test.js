@@ -267,6 +267,24 @@ test('runQuotaPull: a single empty round does not give up early when the pool ha
   assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
 });
 
+test('collectBatch refreshes a stale cached totalItems instead of wrapping into already-pulled items', async () => {
+  const list = await makeList();
+  const key = 'apolloPage_icp1_uk';
+
+  // First pull sees a small live pool (totalEntries 3) — caches totalItems=3.
+  await collectBatch(list, 3, { search: fakeSearchFlat(['a', 'b', 'c']), enrich: fakeEnrich });
+  assert.equal((await readCursor(key)).totalItems, 3);
+
+  // Apollo's live pool later grows (e.g. a sourcing-filter broadening) to 10.
+  // A later top-up must pick up the new, larger total rather than staying
+  // stuck on the stale cached value — otherwise the modulo cursor wraps into
+  // indices it already consumed (all dedup-skipped) and falsely reports the
+  // pool as exhausted while thousands of real net-new companies remain.
+  const biggerPool = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+  await collectBatch(list, 2, { search: fakeSearchFlat(biggerPool), enrich: fakeEnrich });
+  assert.equal((await readCursor(key)).totalItems, 10);
+});
+
 test('collectCompanies skips orgs when enrich throws, continues with others', async () => {
   const list = await makeList({ requestedCount: 3 });
   // enrich throws for 'b', succeeds for others

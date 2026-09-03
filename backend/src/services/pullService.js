@@ -74,7 +74,15 @@ async function collectBatch(list, k, { search, enrich }) {
   const getPage = async (page) => {
     if (!pageCache.has(page)) {
       const res = await search(list.profile, list.region, page, perPage);
-      if (res.pagination.totalEntries && !totalItems) {
+      // Refresh on every fetch, not just once — Apollo's live total for this
+      // region/profile query grows over time as sourcing filters broaden.
+      // A totalItems cached once and never updated makes the modulo cursor
+      // wrap into already-pulled indices and falsely report the pool as
+      // exhausted long before it actually is (see 2026-09-03 investigation:
+      // benelux/icp1 was cached at 382 from 2026-08-03, while the live pool
+      // had grown to 2936). The apolloAccountId dedup check already guards
+      // against double-saving, so it's safe to let this value move.
+      if (res.pagination.totalEntries && res.pagination.totalEntries !== totalItems) {
         totalItems = res.pagination.totalEntries;
         await setTotalItems(key, totalItems);
       }
