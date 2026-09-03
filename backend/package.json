@@ -9,6 +9,9 @@
     "dev": "nodemon server.js",
     "test": "node --test 'test/**/*.test.js'"
   },
+  "nodemonConfig": {
+    "watch": ["server.js", "src", ".env"]
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "axios": "^1.13.6",
