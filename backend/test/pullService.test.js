@@ -6,6 +6,7 @@ const Company = require('../src/models/Company');
 const PipelineState = require('../src/models/PipelineState');
 const { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, markStaleListsFailed } =
   require('../src/services/pullService');
+const { SESSION_MAX_PULLED } = require('../src/config/pullConfig');
 
 before(async () => db.connect());
 after(async () => db.disconnect());
@@ -235,7 +236,7 @@ test('runQuotaPull: respects SESSION_MAX_PULLED when nothing qualifies', async (
   await runPull(list._id, deps);
   const fresh = await List.findById(list._id);
   assert.equal(fresh.status, 'ready');
-  assert.ok(fresh.pulledCount <= 60, `pulled ${fresh.pulledCount}`);
+  assert.ok(fresh.pulledCount <= SESSION_MAX_PULLED, `pulled ${fresh.pulledCount}`);
   assert.ok(fresh.pulledCount >= 10, 'at least the first batch');
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchLeads, sendDecision } from '../api';
+import { fetchLeads, sendDecision, bulkReject } from '../api';
 import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../icons';
 import { getCompanyHref, hasUsableDomain } from '../utils/companyLink';
 import { complianceBadge } from '../utils/compliance';
@@ -39,6 +39,8 @@ export default function ListTable({ listId, onDecision }) {
   const [busyIds, setBusyIds] = useState(() => new Set());
   const [override, setOverride] = useState(null); // { lead, decision } | null
   const [overrideComment, setOverrideComment] = useState('');
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     fetchLeads(listId)
@@ -62,12 +64,61 @@ export default function ListTable({ listId, onDecision }) {
     setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
   };
 
+  // Selection only ever covers pending rows (the only ones a Reject action
+  // applies to) — clear it whenever the filters change so it can't silently
+  // hold ids the SDR can no longer see.
+  useEffect(() => setSelected(new Set()), [verdictFilter, sdrFilter]);
+
+  const pendingRows = useMemo(() => rows.filter((l) => l.sdrStatus === 'pending'), [rows]);
+  const allSelected = pendingRows.length > 0 && pendingRows.every((l) => selected.has(l._id));
+
+  const toggleSelectAll = () => {
+    setSelected(allSelected ? new Set() : new Set(pendingRows.map((l) => l._id)));
+  };
+
+  const toggleRow = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const submitBulkReject = async () => {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setBulkBusy(true);
+    setError('');
+    try {
+      await bulkReject(listId, ids);
+      // Refetch rather than optimistically patch: a selected row could have
+      // been individually decided (via its own row action) in between being
+      // checked and the bulk submit — the backend correctly leaves it alone,
+      // and only a refetch is guaranteed to match that exactly.
+      setLeads(await fetchLeads(listId));
+      setSelected(new Set());
+      onDecision?.();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const submitDecision = async (lead, decision, comment) => {
     setBusyIds((prev) => new Set(prev).add(lead._id));
     setError('');
     try {
       const updated = await sendDecision(lead._id, decision, comment);
       setLeads((prev) => prev.map((l) => (l._id === lead._id ? { ...l, sdrStatus: updated.sdrStatus } : l)));
+      // A row decided individually is no longer a valid bulk-selection target.
+      setSelected((prev) => {
+        if (!prev.has(lead._id)) return prev;
+        const next = new Set(prev);
+        next.delete(lead._id);
+        return next;
+      });
       // The backend flips the list ready <-> reviewed off the last pending lead,
       // so the parent has to re-read it for the confirm bar to appear here.
       onDecision?.();
@@ -127,6 +178,19 @@ export default function ListTable({ listId, onDecision }) {
           </select>
         </label>
       </div>
+      {selected.size > 0 && (
+        <div className="decision-row" style={{ marginTop: 0, marginBottom: 12, justifyContent: 'space-between' }}>
+          <span className="muted">{selected.size} selected</span>
+          <div className="decision-row" style={{ margin: 0 }}>
+            <button className="btn reject small" onClick={submitBulkReject} disabled={bulkBusy}>
+              <IconX /> Reject {selected.size} selected
+            </button>
+            <button className="btn ghost small" onClick={() => setSelected(new Set())} disabled={bulkBusy}>
+              Clear selection
+            </button>
+          </div>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
       {!rows.length ? (
         <p className="muted">No companies match these filters.</p>
@@ -134,6 +198,15 @@ export default function ListTable({ listId, onDecision }) {
         <table className="table-plain">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  disabled={!pendingRows.length}
+                  title="Select all pending rows"
+                />
+              </th>
               {COLUMNS.slice(0, 3).map((col) => (
                 <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
                   {col.label}
@@ -161,6 +234,11 @@ export default function ListTable({ listId, onDecision }) {
               const noDomain = !hasUsableDomain(lead.website);
               return (
               <tr key={lead._id}>
+                <td>
+                  {lead.sdrStatus === 'pending' && (
+                    <input type="checkbox" checked={selected.has(lead._id)} onChange={() => toggleRow(lead._id)} />
+                  )}
+                </td>
                 <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
                 <td>{lead.employees ?? '—'}</td>
                 <td>{lead.country || '—'}</td>

@@ -71,6 +71,9 @@ export const fetchContacts = (id) => request(`/api/lists/${id}/contacts`);
 export const sendDecision = (leadId, decision, comment) =>
   request(`/api/leads/${leadId}/decision`, { method: 'POST', body: JSON.stringify({ decision, comment }) });
 
+export const bulkReject = (listId, ids) =>
+  request('/api/leads/bulk-reject', { method: 'POST', body: JSON.stringify({ listId, ids }) });
+
 export const pushContactToHubspot = (contactId) =>
   request(`/api/contacts/${contactId}/hubspot`, { method: 'POST' });
 

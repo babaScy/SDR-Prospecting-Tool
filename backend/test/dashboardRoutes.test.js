@@ -168,3 +168,60 @@ test('decision validates input and 404s on unknown lead', async () => {
   const badId = await admin(request(app).post('/api/leads/not-an-id/decision')).send({ decision: 'accepted' });
   assert.equal(badId.status, 404);
 });
+
+test('POST /api/leads/bulk-reject rejects only pending ids in that list, ignores foreign/already-decided ids, and flips the list to reviewed', async () => {
+  const { list, a, b, c } = await seedList('davidv@scytale.ai');
+  const { list: otherList, a: z } = await seedList('davidv@scytale.ai', 'other-');
+  // b is already decided — bulk-reject must leave it alone, not "re-reject" it.
+  await Company.findByIdAndUpdate(b._id, { $set: { sdrStatus: 'accepted', sdrReviewedAt: new Date() } });
+
+  const res = await asSdr(request(app).post('/api/leads/bulk-reject'))
+    .send({ listId: list._id.toString(), ids: [a._id, b._id, c._id, z._id] });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.modifiedCount, 2); // a and c only
+
+  assert.equal((await Company.findById(a._id)).sdrStatus, 'rejected');
+  assert.equal((await Company.findById(c._id)).sdrStatus, 'rejected');
+  assert.equal((await Company.findById(b._id)).sdrStatus, 'accepted'); // untouched
+  assert.equal((await Company.findById(z._id)).sdrStatus, 'pending'); // untouched — different list
+
+  const freshList = await List.findById(list._id);
+  assert.equal(freshList.status, 'reviewed'); // a rejected, b accepted, c rejected — no pending left
+  const freshOtherList = await List.findById(otherList._id);
+  assert.equal(freshOtherList.status, 'ready'); // untouched
+});
+
+test('POST /api/leads/bulk-reject is 403 for a non-owning SDR, allowed for admin', async () => {
+  const { list, a, b } = await seedList('davidv@scytale.ai');
+  const forbidden = await asOtherSdr(request(app).post('/api/leads/bulk-reject'))
+    .send({ listId: list._id.toString(), ids: [a._id] });
+  assert.equal(forbidden.status, 403);
+  assert.equal((await Company.findById(a._id)).sdrStatus, 'pending');
+
+  const allowed = await admin(request(app).post('/api/leads/bulk-reject'))
+    .send({ listId: list._id.toString(), ids: [b._id] });
+  assert.equal(allowed.status, 200);
+  assert.equal((await Company.findById(b._id)).sdrStatus, 'rejected');
+});
+
+test('POST /api/leads/bulk-reject is 409 once the list review is confirmed', async () => {
+  const { list, a } = await seedList('davidv@scytale.ai');
+  await List.findByIdAndUpdate(list._id, { $set: { reviewConfirmedAt: new Date() } });
+  const res = await asSdr(request(app).post('/api/leads/bulk-reject'))
+    .send({ listId: list._id.toString(), ids: [a._id] });
+  assert.equal(res.status, 409);
+  assert.equal((await Company.findById(a._id)).sdrStatus, 'pending');
+});
+
+test('POST /api/leads/bulk-reject validates input', async () => {
+  const { list, a } = await seedList('davidv@scytale.ai');
+  const emptyIds = await asSdr(request(app).post('/api/leads/bulk-reject')).send({ listId: list._id.toString(), ids: [] });
+  assert.equal(emptyIds.status, 400);
+  const badId = await asSdr(request(app).post('/api/leads/bulk-reject')).send({ listId: list._id.toString(), ids: ['not-an-id'] });
+  assert.equal(badId.status, 400);
+  const badListId = await asSdr(request(app).post('/api/leads/bulk-reject')).send({ listId: 'not-an-id', ids: [a._id] });
+  assert.equal(badListId.status, 400);
+  const missingList = await admin(request(app).post('/api/leads/bulk-reject'))
+    .send({ listId: '64b000000000000000000000', ids: [a._id] });
+  assert.equal(missingList.status, 404);
+});

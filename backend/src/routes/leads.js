@@ -7,6 +7,19 @@ const hubspotService = require('../services/hubspotService');
 
 const router = express.Router();
 
+// Flip the parent list between ready <-> reviewed based on remaining pending
+// work — shared by the single-decision route and bulk-reject below.
+async function syncListReviewStatus(listId) {
+  const list = await List.findById(listId);
+  if (list && ['ready', 'reviewed'].includes(list.status)) {
+    const pendingLeft = await Company.countDocuments({ listId, sdrStatus: 'pending' });
+    const target = pendingLeft === 0 ? 'reviewed' : 'ready';
+    if (list.status !== target) {
+      await List.findByIdAndUpdate(list._id, { $set: { status: target } });
+    }
+  }
+}
+
 router.post('/:id/decision', async (req, res, next) => {
   try {
     const { decision, comment } = req.body || {};
@@ -51,16 +64,47 @@ router.post('/:id/decision', async (req, res, next) => {
       { new: true }
     );
 
-    // Flip the parent list between ready <-> reviewed based on remaining work.
-    if (ownerList && ['ready', 'reviewed'].includes(ownerList.status)) {
-      const pendingLeft = await Company.countDocuments({ listId: company.listId, sdrStatus: 'pending' });
-      const target = pendingLeft === 0 ? 'reviewed' : 'ready';
-      if (ownerList.status !== target) {
-        await List.findByIdAndUpdate(ownerList._id, { $set: { status: target } });
-      }
-    }
+    await syncListReviewStatus(company.listId);
 
     res.json(company);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Bulk-reject: select many pending leads in one list and reject them all in
+// one call, instead of one-at-a-time via /:id/decision. Reject-only (no bulk
+// accept) — accept still needs the per-company no-domain check, which reads
+// oddly as a silent bulk skip; one-at-a-time stays the way to accept.
+router.post('/bulk-reject', async (req, res, next) => {
+  try {
+    const { listId, ids } = req.body || {};
+    if (!mongoose.isValidObjectId(listId)) {
+      return res.status(400).json({ error: 'listId must be a valid id' });
+    }
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => mongoose.isValidObjectId(id))) {
+      return res.status(400).json({ error: 'ids must be a non-empty array of valid ids' });
+    }
+
+    const list = await List.findById(listId);
+    if (!list) return res.status(404).json({ error: 'List not found' });
+    if (req.user.role !== 'admin' && list.assignedTo !== req.user.email) {
+      return res.status(403).json({ error: 'Not your list' });
+    }
+    if (list.reviewConfirmedAt) {
+      return res.status(409).json({ error: 'Review already confirmed — decisions are locked' });
+    }
+
+    // Scoped to this list and to still-pending leads — an id that's foreign
+    // to this list or already decided is silently left alone, not re-rejected.
+    const result = await Company.updateMany(
+      { _id: { $in: ids }, listId, sdrStatus: 'pending' },
+      { $set: { sdrStatus: 'rejected', sdrReviewedAt: new Date() } }
+    );
+
+    await syncListReviewStatus(listId);
+
+    res.json({ modifiedCount: result.modifiedCount });
   } catch (err) {
     next(err);
   }
