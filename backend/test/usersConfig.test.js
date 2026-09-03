@@ -5,12 +5,21 @@ const { REGIONS } = require('../src/config/filters');
 
 const sdrs = USERS.filter((u) => u.role === 'sdr');
 const inbound = USERS.filter((u) => u.role === 'inbound');
+const admins = USERS.filter((u) => u.role === 'admin');
 
-test('roster has one admin, 18 SDRs, and 2 inbound reps', () => {
-  assert.equal(USERS.filter((u) => u.role === 'admin').length, 1);
+test('roster has two admins, 18 SDRs, and 2 inbound reps', () => {
+  assert.equal(admins.length, 2);
   assert.equal(sdrs.length, 18);
   assert.equal(inbound.length, 2);
-  assert.equal(USERS.length, 21);
+  assert.equal(USERS.length, 22);
+});
+
+// karlm@scytale.ai added as admin on 2026-09-03.
+test('karlm is an admin with no regions', () => {
+  const karlm = USERS.find((u) => u.email === 'karlm@scytale.ai');
+  assert.ok(karlm, 'karlm@scytale.ai should be present');
+  assert.equal(karlm.role, 'admin');
+  assert.deepEqual(karlm.regions, []);
 });
 
 // Inbound reps get no prospecting access, Objection Handler only — see
@@ -42,9 +51,8 @@ test('every email is lowercase', () => {
   for (const u of USERS) assert.equal(u.email, u.email.toLowerCase(), u.email);
 });
 
-test('every SDR has at least one valid region; admin has none', () => {
-  const admin = USERS.find((u) => u.role === 'admin');
-  assert.deepEqual(admin.regions, []);
+test('every SDR has at least one valid region; admins have none', () => {
+  for (const admin of admins) assert.deepEqual(admin.regions, [], `${admin.email} should have no regions`);
   for (const u of sdrs) {
     assert.ok(u.regions.length >= 1, `${u.email} has no region`);
     for (const r of u.regions) assert.ok(REGIONS[r], `${u.email} has unknown region ${r}`);
