@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS } = require('../config/filters');
+const { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS, REGION_KEYWORD_EXCLUDES } = require('../config/filters');
 
 const PROFILE_FILTERS = { icp1: ICP1_FILTERS, icp2: ICP2_FILTERS, icp3: ICP3_FILTERS };
 
@@ -17,7 +17,12 @@ const buildSearchBody = (profile, region, page, perPage) => {
   if (!baseFilters) throw new Error(`Unknown profile: ${profile}`);
   const locations = REGIONS[region];
   if (!locations) throw new Error(`Unknown region: ${region}`);
-  return { page, per_page: perPage, ...baseFilters, organization_locations: locations };
+  const regionExcludes = REGION_KEYWORD_EXCLUDES[region] || [];
+  return {
+    page, per_page: perPage, ...baseFilters,
+    organization_locations: locations,
+    q_not_organization_keyword_tags: [...baseFilters.q_not_organization_keyword_tags, ...regionExcludes],
+  };
 };
 
 const searchCompaniesPage = async (profile, region, page, perPage = 25) => {

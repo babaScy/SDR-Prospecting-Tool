@@ -41,6 +41,24 @@ test('buildSearchBody keeps the industry exclude-list untouched', () => {
   ]);
 });
 
+test('buildSearchBody adds benelux-only keyword excludes (2026-09-04 quality fix), untouched elsewhere', () => {
+  const BENELUX_ONLY_EXCLUDES = ['education management', 'energy & utilities'];
+
+  const benelux = buildSearchBody('icp1', 'benelux', 1, 25);
+  for (const kw of BENELUX_ONLY_EXCLUDES) {
+    assert.ok(benelux.q_not_organization_keyword_tags.includes(kw), `benelux missing exclude: ${kw}`);
+  }
+  // The shared exclude list underneath is still there too, untouched.
+  assert.ok(benelux.q_not_organization_keyword_tags.includes('management consulting'));
+
+  for (const region of ['uk', 'us', 'nordics', 'dach', 'aus', 'poland', 'taiwan']) {
+    const body = buildSearchBody('icp1', region, 1, 25);
+    for (const kw of BENELUX_ONLY_EXCLUDES) {
+      assert.equal(body.q_not_organization_keyword_tags.includes(kw), false, `${region} should not have benelux-only exclude: ${kw}`);
+    }
+  }
+});
+
 test('buildSearchBody includes the two new keyword tags for every profile', () => {
   for (const profile of ['icp1', 'icp2', 'icp3']) {
     const body = buildSearchBody(profile, 'nordics', 1, 25);

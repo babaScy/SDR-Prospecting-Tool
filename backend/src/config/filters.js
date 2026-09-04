@@ -106,6 +106,33 @@ const COMMON_FILTERS = {
   ],
 };
 
+// Region-specific additions to COMMON_FILTERS.q_not_organization_keyword_tags,
+// layered on top of (not replacing) the shared exclude list. Added 2026-09-04
+// for benelux only, after the 2026-08-21 industry-tag-restriction removal
+// (see filters.js history) left benelux's pool disproportionately diluted
+// with non-software companies (Nordics/UK/DACH held up fine on the same
+// shared filters — see docs/superpowers/2026-09-04 benelux investigation).
+//
+// These 2 keywords were chosen from real disqualified-vs-qualified keyword
+// frequency on the last 5 benelux lists, then verified against a LIVE Apollo
+// count (not just our own already-pulled sample, which underestimated the
+// true pool-wide impact by roughly half for several candidates — e.g.
+// 'manufacturing' alone looked like a ~17%-of-disqualified hit retrospectively
+// but was a live -25.7% pool cut). This 2-keyword combo is live-verified at
+// -17.9% pool size, removing 89/574 (16%) of benelux's disqualified companies
+// for a cost of 19/287 (7%) of already-qualified ones (4.7:1 ratio) — the
+// best live-verified tradeoff found that stays near the size-impact range
+// discussed. Other candidates (manufacturing, nonprofit organization
+// management, mechanical or industrial engineering) had comparable or better
+// retrospective ratios but cut the live pool by 20-49% combined — too
+// aggressive for what was asked ("without reducing the region size too much").
+const REGION_KEYWORD_EXCLUDES = {
+  benelux: [
+    'education management',
+    'energy & utilities',
+  ],
+};
+
 const ICP1_FILTERS = {
   ...COMMON_FILTERS,
   organization_num_employees_ranges: ['1,10', '11,20', '21,50'],
@@ -121,4 +148,4 @@ const ICP3_FILTERS = {
   organization_num_employees_ranges: ['251,500', '501,1000', '1001,5000', '5001,10000', '10001,'],
 };
 
-module.exports = { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS };
+module.exports = { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS, REGION_KEYWORD_EXCLUDES };
