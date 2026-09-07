@@ -4,7 +4,7 @@ const db = require('./helpers/db');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
 const PipelineState = require('../src/models/PipelineState');
-const { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, markStaleListsFailed } =
+const { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, resumeStaleLists } =
   require('../src/services/pullService');
 const { SESSION_MAX_PULLED } = require('../src/config/pullConfig');
 
@@ -128,6 +128,17 @@ test('collectCompanies skips companies that already exist (dedup)', async () => 
   );
 });
 
+test('collectCompanies resumes from list.pulledCount instead of restarting the count', async () => {
+  // Simulates a crash-and-restart mid-job: 2 companies already saved from an
+  // earlier (interrupted) run of this same list.
+  const list = await makeList({ requestedCount: 4, pulledCount: 2 });
+  await Company.create({ apolloAccountId: 'x', companyName: 'X', listId: list._id });
+  await Company.create({ apolloAccountId: 'y', companyName: 'Y', listId: list._id });
+  const saved = await collectCompanies(list, { search: fakeSearchFlat(['a', 'b', 'c', 'd']), enrich: fakeEnrich });
+  assert.equal(saved, 4); // resumed total, not 2 (already) + 4 (fresh) = 6
+  assert.equal(await Company.countDocuments({ listId: list._id }), 4);
+});
+
 test('collectCompanies stops after pool exhaustion (no infinite loop)', async () => {
   const list = await makeList({ requestedCount: 50 });
   const saved = await collectCompanies(list, { search: fakeSearchFlat(['a', 'b', 'c']), enrich: fakeEnrich });
@@ -182,21 +193,36 @@ test('logProgress caps progressLog at 50 entries', async () => {
   assert.equal(fresh.lastMessage, 'msg 55');
 });
 
-test('markStaleListsFailed flips pulling/qualifying lists to failed', async () => {
-  await makeList({ status: 'pulling' });
-  await makeList({ status: 'qualifying' });
-  await makeList({ status: 'ready' });
-  const n = await markStaleListsFailed();
-  assert.equal(n, 2);
-  assert.equal(await List.countDocuments({ status: 'failed' }), 2);
-  assert.equal(await List.countDocuments({ status: 'ready' }), 1);
+test('resumeStaleLists resumes pulling/qualifying lists instead of failing them', async () => {
+  const stranded = await makeList({ pullMode: 'quota', requestedCount: 5, status: 'qualifying', pulledCount: 3 });
+  await makeList({ status: 'ready' }); // untouched control
+
+  const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    qualify: async (companies) => {
+      for (const c of companies) await Company.findByIdAndUpdate(c._id, { $set: { status: 'qualified' } });
+      return new Map();
+    },
+  };
+  const { resumed } = await resumeStaleLists(deps);
+  assert.equal(resumed, 1);
+
+  // Let the fire-and-forget resumed run finish.
+  await new Promise((r) => setTimeout(r, 50));
+
+  const fresh = await List.findById(stranded._id);
+  assert.equal(fresh.status, 'ready'); // resumed to completion, not left as 'failed'
+  assert.equal(await List.countDocuments({ status: 'ready' }), 2);
 });
 
-test('markStaleListsFailed also flips sourcing lists to failed', async () => {
+test('resumeStaleLists still flips sourcing lists to failed (not resumable yet)', async () => {
   await makeList({ status: 'sourcing' });
-  const n = await markStaleListsFailed();
-  assert.ok(n >= 1);
+  const { failed } = await resumeStaleLists();
+  assert.ok(failed >= 1);
   assert.equal(await List.countDocuments({ status: 'sourcing' }), 0);
+  assert.equal(await List.countDocuments({ status: 'failed' }), 1);
 });
 
 test('runQuotaPull: first batch is 10, tops up by (5 - qualifiedToday), stops at 5', async () => {
@@ -223,6 +249,31 @@ test('runQuotaPull: first batch is 10, tops up by (5 - qualifiedToday), stops at
   const fresh = await List.findById(list._id);
   assert.equal(fresh.status, 'ready');
   assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
+});
+
+test('runQuotaPull resumes from list.pulledCount instead of restarting the first batch', async () => {
+  // Simulates a crash-and-restart mid-job: 3 companies already pulled and
+  // qualified in an earlier (interrupted) run of this same list.
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, pulledCount: 3, assignedTo: 'davidv@scytale.ai' });
+  for (let i = 0; i < 3; i++) {
+    await Company.create({ apolloAccountId: `pre${i}`, companyName: `Pre ${i}`, listId: list._id, status: 'qualified' });
+  }
+  const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    qualify: async (companies) => {
+      for (const c of companies) await Company.findByIdAndUpdate(c._id, { $set: { status: 'qualified' } });
+      return new Map();
+    },
+  };
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
+  // Only 2 NEW companies pulled to top up 3 -> 5 — not a fresh 10-item first
+  // batch stacked on top of the 3 that already existed.
+  assert.equal(await Company.countDocuments({ listId: list._id }), 5);
 });
 
 test('runQuotaPull: respects SESSION_MAX_PULLED when nothing qualifies', async () => {

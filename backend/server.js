@@ -12,7 +12,7 @@ if (missing.length) {
 
 const mongoose = require('mongoose');
 const app = require('./src/app');
-const { markStaleListsFailed } = require('./src/services/pullService');
+const { resumeStaleLists } = require('./src/services/pullService');
 
 const PORT = process.env.PORT || 4000;
 
@@ -20,8 +20,9 @@ mongoose
   .connect(process.env.MONGODB_URI, { dbName: 'PROSPECTOR' })
   .then(async () => {
     console.log('MongoDB connected (db: PROSPECTOR)');
-    const stale = await markStaleListsFailed();
-    if (stale) console.log(`Marked ${stale} interrupted list(s) as failed`);
+    const { resumed, failed } = await resumeStaleLists();
+    if (resumed) console.log(`Resuming ${resumed} interrupted pull/qualify list(s)`);
+    if (failed) console.log(`Marked ${failed} interrupted sourcing list(s) as failed`);
     app.listen(PORT, () => console.log(`Prospector API on http://localhost:${PORT}`));
   })
   .catch((err) => {

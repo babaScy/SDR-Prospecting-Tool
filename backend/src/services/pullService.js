@@ -131,7 +131,10 @@ async function collectBatch(list, k, { search, enrich }) {
 // Admin path: loop collectBatch toward requestedCount, stopping when a round
 // saves 0 (pool exhausted) so we never spin forever on a thin region.
 async function collectCompanies(list, { search, enrich }) {
-  let saved = 0;
+  // Seeded from list.pulledCount (not 0) so a resumed run after a server
+  // restart tops up toward requestedCount instead of over-pulling on top of
+  // whatever an earlier, interrupted run already saved.
+  let saved = list.pulledCount || 0;
   while (saved < list.requestedCount) {
     const round = await collectBatch(list, list.requestedCount - saved, { search, enrich });
     saved += round;
@@ -153,8 +156,11 @@ async function runQuotaPull(list, deps = {}) {
   const qualifiedToday = deps.qualifiedToday || quotaService.qualifiedToday;
 
   const sdr = list.assignedTo;
-  let pulledThisSession = 0;
-  let round = 0;
+  // Seeded from list.pulledCount (not 0) so a resumed run after a server
+  // restart tops up from where an earlier, interrupted run left off, instead
+  // of redoing the FIRST_BATCH_SIZE first-batch round on top of it.
+  let pulledThisSession = list.pulledCount || 0;
+  let round = pulledThisSession > 0 ? 1 : 0;
   let emptyRounds = 0;
 
   while (true) {
@@ -238,13 +244,29 @@ async function runPull(listId, deps = {}) {
   }
 }
 
-// Startup recovery: the job runs in-process, so a restart strands running lists.
-async function markStaleListsFailed() {
-  const result = await List.updateMany(
-    { status: { $in: ['pulling', 'qualifying', 'sourcing'] } },
+// Startup recovery: the job runs in-process, so a restart (a crash, a deploy,
+// or — in dev — nodemon restarting on a source-file edit while a pull is
+// mid-flight) strands running lists. Pull/qualify jobs are resumable: both
+// collectCompanies and runQuotaPull now seed their running counts from
+// list.pulledCount (already persisted after every round) instead of 0, so
+// re-running them from here just continues where the crash left off — a
+// crash only costs whichever single company was mid-flight at that instant,
+// not the whole list (see 2026-09-07 investigation: a Benelux SDR's list hit
+// this exact path and lost nothing — it had already reached quota). Contact
+// sourcing ('sourcing' status) isn't resumable yet, so those are still
+// flipped to failed as before.
+async function resumeStaleLists(deps = {}) {
+  const stranded = await List.find({ status: { $in: ['pulling', 'qualifying'] } });
+  for (const list of stranded) {
+    runPull(list._id, deps).catch((err) => console.error(`[pull] resume failed for ${list._id}: ${err.message}`));
+  }
+
+  const sourcingResult = await List.updateMany(
+    { status: 'sourcing' },
     { $set: { status: 'failed', error: 'Server restarted mid-job' } }
   );
-  return result.modifiedCount;
+
+  return { resumed: stranded.length, failed: sourcingResult.modifiedCount };
 }
 
 module.exports = {
@@ -255,5 +277,5 @@ module.exports = {
   reserveItems,
   readCursor,
   logProgress,
-  markStaleListsFailed,
+  resumeStaleLists,
 };
