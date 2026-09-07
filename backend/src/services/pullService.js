@@ -5,7 +5,7 @@ const apollo = require('./apolloService');
 const quotaService = require('./quotaService');
 const { makeLimiter } = require('../util/limiter');
 const {
-  APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, DAILY_QUALIFIED_QUOTA, SESSION_MAX_PULLED,
+  APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, getDailyQuota, SESSION_MAX_PULLED,
   MAX_CONSECUTIVE_EMPTY_ROUNDS,
 } = require('../config/pullConfig');
 
@@ -146,7 +146,7 @@ async function collectCompanies(list, { search, enrich }) {
 }
 
 // SDR self-serve path: first batch of FIRST_BATCH_SIZE, then top-ups of
-// (DAILY_QUALIFIED_QUOTA - qualifiedToday), qualifying each round's new
+// (region's daily quota - qualifiedToday), qualifying each round's new
 // pending companies, until quota reached / safety cap / pool exhausted.
 async function runQuotaPull(list, deps = {}) {
   const search = deps.search || apollo.searchCompaniesPage;
@@ -156,6 +156,7 @@ async function runQuotaPull(list, deps = {}) {
   const qualifiedToday = deps.qualifiedToday || quotaService.qualifiedToday;
 
   const sdr = list.assignedTo;
+  const quota = getDailyQuota(list.region);
   // Seeded from list.pulledCount (not 0) so a resumed run after a server
   // restart tops up from where an earlier, interrupted run left off, instead
   // of redoing the FIRST_BATCH_SIZE first-batch round on top of it.
@@ -164,11 +165,11 @@ async function runQuotaPull(list, deps = {}) {
   let emptyRounds = 0;
 
   while (true) {
-    const already = await qualifiedToday(sdr);
-    if (already >= DAILY_QUALIFIED_QUOTA) break;
+    const already = await qualifiedToday(sdr, list.region);
+    if (already >= quota) break;
     if (pulledThisSession >= SESSION_MAX_PULLED) break;
 
-    const want = round === 0 ? FIRST_BATCH_SIZE : DAILY_QUALIFIED_QUOTA - already;
+    const want = round === 0 ? FIRST_BATCH_SIZE : quota - already;
     const k = Math.min(want, SESSION_MAX_PULLED - pulledThisSession);
     if (k <= 0) break;
 

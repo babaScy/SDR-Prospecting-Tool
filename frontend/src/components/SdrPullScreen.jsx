@@ -12,10 +12,9 @@ export default function SdrPullScreen({ regions = [] }) {
   const [quota, setQuota] = useState(null); // { qualifiedToday, quota }
   const [error, setError] = useState('');
 
-  const refreshQuota = () => fetchQuota().then(setQuota).catch(() => {});
+  const refreshQuota = () => fetchQuota(region).then(setQuota).catch(() => {});
 
   useEffect(() => {
-    refreshQuota();
     fetchLists()
       .then((lists) => {
         const running = lists.find((l) => RUNNING.includes(l.status));
@@ -23,6 +22,11 @@ export default function SdrPullScreen({ regions = [] }) {
       })
       .catch(() => {});
   }, []);
+
+  // Daily cap varies by region, so re-fetch whenever the selected region changes.
+  useEffect(() => {
+    refreshQuota();
+  }, [region]);
 
   const isRunning = activeList && RUNNING.includes(activeList.status);
 

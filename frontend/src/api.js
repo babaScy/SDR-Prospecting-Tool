@@ -44,7 +44,8 @@ export const startPull = (profile, region, count, assignedTo) =>
 export const startSdrPull = (region, profile) =>
   request('/api/pull', { method: 'POST', body: JSON.stringify({ region, profile }) });
 
-export const fetchQuota = () => request('/api/pull/quota');
+export const fetchQuota = (region) =>
+  request(`/api/pull/quota${region ? `?region=${encodeURIComponent(region)}` : ''}`);
 
 export const fetchQualificationMode = () => request('/api/settings/qualification-mode');
 export const setQualificationMode = (mode) =>

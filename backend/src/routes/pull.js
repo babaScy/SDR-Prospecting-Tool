@@ -4,7 +4,7 @@ const { REGIONS } = require('../config/filters');
 const pullService = require('../services/pullService');
 const quotaService = require('../services/quotaService');
 const USERS = require('../config/users');
-const { DAILY_QUALIFIED_QUOTA } = require('../config/pullConfig');
+const { getDailyQuota } = require('../config/pullConfig');
 
 const SDR_EMAILS = USERS.filter((u) => u.role === 'sdr').map((u) => u.email);
 
@@ -21,13 +21,19 @@ const makeName = (profile, region) =>
 
 const RUNNING = { status: { $in: ['pulling', 'qualifying'] } };
 
-// SDR quota indicator.
+// SDR quota indicator. The cap depends on region (see pullConfig
+// REGION_DAILY_CAPS), so the caller picks which of their regions to check —
+// defaulting to their first — and the frontend re-fetches on region change.
 router.get('/quota', async (req, res, next) => {
   try {
     if (req.user.role !== 'sdr') return res.status(403).json({ error: 'SDR only' });
-    const qualifiedToday = await quotaService.qualifiedToday(req.user.email);
+    const region = req.query.region || req.user.regions?.[0];
+    if (!region || !req.user.regions?.includes(region)) {
+      return res.status(400).json({ error: 'region must be one of your assigned regions' });
+    }
+    const qualifiedToday = await quotaService.qualifiedToday(req.user.email, region);
     const pulledToday = await quotaService.pulledToday(req.user.email);
-    res.json({ qualifiedToday, quota: DAILY_QUALIFIED_QUOTA, pulledToday });
+    res.json({ qualifiedToday, quota: getDailyQuota(region), pulledToday });
   } catch (err) {
     next(err);
   }
@@ -49,7 +55,7 @@ async function sdrPull(req, res, next) {
   if (await quotaService.pulledToday(req.user.email)) {
     return res.status(429).json({ error: 'You can only start one pull per day — resets at midnight' });
   }
-  if (await quotaService.quotaReached(req.user.email)) {
+  if (await quotaService.quotaReached(req.user.email, region)) {
     return res.status(429).json({ error: 'Daily limit reached — resets at midnight' });
   }
   if (sdrPullsInFlight.has(req.user.email)) {
@@ -63,7 +69,7 @@ async function sdrPull(req, res, next) {
     const list = await List.create({
       name: makeName(profile, region),
       profile, region,
-      requestedCount: DAILY_QUALIFIED_QUOTA,
+      requestedCount: getDailyQuota(region),
       assignedTo: req.user.email,
       pullMode: 'quota',
       status: 'pulling',

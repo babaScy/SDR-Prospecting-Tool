@@ -226,7 +226,9 @@ test('resumeStaleLists still flips sourcing lists to failed (not resumable yet)'
 });
 
 test('runQuotaPull: first batch is 10, tops up by (5 - qualifiedToday), stops at 5', async () => {
-  const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
+  // 'nordics' keeps the default 5 cap (uk is now a raised-cap region — see
+  // the dedicated test below for that path).
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, region: 'nordics' });
   const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
   const reserved = [];        // record k per round
   const qualifiedByRound = [3, 1, 1]; // round outcomes → cumulative 3,4,5
@@ -251,10 +253,33 @@ test('runQuotaPull: first batch is 10, tops up by (5 - qualifiedToday), stops at
   assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
 });
 
+test('runQuotaPull tops up to a region\'s raised cap (uk: 7, not the default 5)', async () => {
+  const list = await makeList({ pullMode: 'quota', requestedCount: 7, region: 'uk' });
+  const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
+  const qualifiedByRound = [3, 2, 1, 1]; // round outcomes → cumulative 3,5,6,7
+  let round = 0;
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    qualify: async (companies) => {
+      const n = qualifiedByRound[round] ?? 0;
+      for (let i = 0; i < n && i < companies.length; i++) {
+        await Company.findByIdAndUpdate(companies[i]._id, { $set: { status: 'qualified' } });
+      }
+      round++;
+      return new Map();
+    },
+  };
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 7);
+});
+
 test('runQuotaPull resumes from list.pulledCount instead of restarting the first batch', async () => {
   // Simulates a crash-and-restart mid-job: 3 companies already pulled and
   // qualified in an earlier (interrupted) run of this same list.
-  const list = await makeList({ pullMode: 'quota', requestedCount: 5, pulledCount: 3, assignedTo: 'davidv@scytale.ai' });
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, pulledCount: 3, assignedTo: 'davidv@scytale.ai', region: 'nordics' });
   for (let i = 0; i < 3; i++) {
     await Company.create({ apolloAccountId: `pre${i}`, companyName: `Pre ${i}`, listId: list._id, status: 'qualified' });
   }
@@ -277,7 +302,7 @@ test('runQuotaPull resumes from list.pulledCount instead of restarting the first
 });
 
 test('runQuotaPull: respects SESSION_MAX_PULLED when nothing qualifies', async () => {
-  const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, region: 'nordics' });
   const pool = Array.from({ length: 200 }, (_, i) => `z${i}`);
   const deps = {
     search: fakeSearchFlat(pool),
@@ -292,7 +317,7 @@ test('runQuotaPull: respects SESSION_MAX_PULLED when nothing qualifies', async (
 });
 
 test('runQuotaPull: a single empty round does not give up early when the pool has more left', async () => {
-  const list = await makeList({ pullMode: 'quota', requestedCount: 5 });
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, region: 'nordics' });
   const pool = Array.from({ length: 40 }, (_, i) => `c${i}`);
   // c10 is what the next 1-item top-up round would reserve — pre-existing, so
   // that round dedups to 0 saved even though c11+ are still fresh and available.

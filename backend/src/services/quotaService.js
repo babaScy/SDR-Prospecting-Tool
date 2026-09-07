@@ -1,10 +1,13 @@
 const List = require('../models/List');
 const Company = require('../models/Company');
 const { startOfTodayInTz } = require('../util/dayBoundary');
-const { RESET_TZ, DAILY_QUALIFIED_QUOTA } = require('../config/pullConfig');
+const { RESET_TZ, getDailyQuota } = require('../config/pullConfig');
 
-async function qualifiedToday(sdrEmail, now = new Date()) {
-  const listIds = await List.find({ assignedTo: sdrEmail }).distinct('_id');
+// Scoped to a single region, not just the SDR — the daily cap varies by
+// region (see getDailyQuota), and since an SDR only gets one self-serve pull
+// per day (see pulledToday), that pull's region is the only one relevant.
+async function qualifiedToday(sdrEmail, region, now = new Date()) {
+  const listIds = await List.find({ assignedTo: sdrEmail, region }).distinct('_id');
   if (listIds.length === 0) return 0;
   return Company.countDocuments({
     listId: { $in: listIds },
@@ -13,8 +16,8 @@ async function qualifiedToday(sdrEmail, now = new Date()) {
   });
 }
 
-async function quotaReached(sdrEmail, now = new Date()) {
-  return (await qualifiedToday(sdrEmail, now)) >= DAILY_QUALIFIED_QUOTA;
+async function quotaReached(sdrEmail, region, now = new Date()) {
+  return (await qualifiedToday(sdrEmail, region, now)) >= getDailyQuota(region);
 }
 
 // A hard, unconditional backstop: one self-serve pull per SDR per day, no

@@ -51,14 +51,25 @@ test('SDR cannot pull a region they do not cover', async () => {
 });
 
 test('SDR pull is blocked at the daily quota (429)', async () => {
-  const list = await List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 5, assignedTo: 'davidv@scytale.ai', status: 'ready' });
+  // uk's raised cap is 7 (see REGION_DAILY_CAPS) — seed exactly that many.
+  const list = await List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 7, assignedTo: 'davidv@scytale.ai', status: 'ready' });
   const Company = require('../src/models/Company');
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     await Company.create({ apolloAccountId: `q${i}`, companyName: `q${i}`, listId: list._id, status: 'qualified' });
   }
   const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
   assert.equal(res.status, 429);
   assert.equal(runPullCalls.length, 0);
+});
+
+test('SDR pull is not blocked below a raised region cap (6 qualified in uk, cap is 7)', async () => {
+  const list = await List.create({ name: 'x', profile: 'icp1', region: 'uk', requestedCount: 7, assignedTo: 'davidv@scytale.ai', status: 'ready' });
+  const Company = require('../src/models/Company');
+  for (let i = 0; i < 6; i++) {
+    await Company.create({ apolloAccountId: `q${i}`, companyName: `q${i}`, listId: list._id, status: 'qualified' });
+  }
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 201);
 });
 
 test('SDR pull is blocked once they already have a self-serve list today, even under quota (429)', async () => {
@@ -88,12 +99,25 @@ test('POST /api/pull accepts icp3 profile and taiwan region', async () => {
   assert.match(res.body.name, /TAIWAN · ICP3 · /);
 });
 
-test('GET /api/pull/quota returns the SDR count', async () => {
+// davidv's regions are ['dach', 'uk'] — both raised-cap regions, so the
+// default (no ?region=) resolves to the first, 'dach', at cap 7.
+test('GET /api/pull/quota returns the SDR count, defaulting to their first region', async () => {
   const res = await asSdr(request(app).get('/api/pull/quota'));
   assert.equal(res.status, 200);
-  assert.equal(res.body.quota, 5);
+  assert.equal(res.body.quota, 7);
   assert.equal(res.body.qualifiedToday, 0);
   assert.equal(res.body.pulledToday, false);
+});
+
+test('GET /api/pull/quota?region= returns that region\'s cap', async () => {
+  const res = await asSdr(request(app).get('/api/pull/quota?region=uk'));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.quota, 7);
+});
+
+test('GET /api/pull/quota rejects a region the SDR does not cover', async () => {
+  const res = await asSdr(request(app).get('/api/pull/quota?region=aus'));
+  assert.equal(res.status, 400);
 });
 
 test('POST /api/pull validates profile, region, count, assignedTo', async () => {
