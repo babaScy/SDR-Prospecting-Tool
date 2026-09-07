@@ -12,6 +12,11 @@ test('buildSearchBody merges profile filters, region locations, paging', () => {
   assert.deepEqual(body.market_segments, ['b2b', 'saas']);
 });
 
+test('buildSearchBody supports southafrica as a region', () => {
+  const body = buildSearchBody('icp1', 'southafrica', 1, 25);
+  assert.deepEqual(body.organization_locations, ['South Africa']);
+});
+
 test('buildSearchBody uses icp2 employee ranges', () => {
   const body = buildSearchBody('icp2', 'us', 1, 25);
   assert.deepEqual(body.organization_num_employees_ranges, ['51,100', '101,200', '201,250']);
@@ -51,7 +56,7 @@ test('buildSearchBody adds benelux-only keyword excludes (2026-09-04 quality fix
   // The shared exclude list underneath is still there too, untouched.
   assert.ok(benelux.q_not_organization_keyword_tags.includes('management consulting'));
 
-  for (const region of ['uk', 'us', 'nordics', 'dach', 'aus', 'poland', 'taiwan']) {
+  for (const region of ['uk', 'us', 'nordics', 'dach', 'aus', 'poland', 'taiwan', 'southafrica']) {
     const body = buildSearchBody('icp1', region, 1, 25);
     for (const kw of BENELUX_ONLY_EXCLUDES) {
       assert.equal(body.q_not_organization_keyword_tags.includes(kw), false, `${region} should not have benelux-only exclude: ${kw}`);

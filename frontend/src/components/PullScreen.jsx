@@ -6,7 +6,7 @@ import {
 } from '../api';
 import USERS from '../users';
 
-const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan'];
+const REGIONS = ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan', 'southafrica'];
 const RUNNING = ['pulling', 'qualifying'];
 const SDRS = USERS.filter((u) => u.role === 'sdr');
 

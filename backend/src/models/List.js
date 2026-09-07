@@ -8,7 +8,7 @@ const listSchema = new mongoose.Schema(
     profile: { type: String, enum: ['icp1', 'icp2', 'icp3'], required: true },
     region: {
       type: String,
-      enum: ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan'],
+      enum: ['uk', 'us', 'benelux', 'nordics', 'dach', 'aus', 'poland', 'taiwan', 'southafrica'],
       required: true,
     },
     requestedCount: { type: Number, required: true },
