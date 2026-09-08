@@ -51,7 +51,8 @@ const changeTypeLabel = (t) => t.split('-').map((w) => w[0].toUpperCase() + w.sl
 const formatDate = (iso) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-const byRecent = (a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt);
+const byNewest = (a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt);
+const byOldest = (a, b) => new Date(a.fetchedAt) - new Date(b.fetchedAt);
 
 // The classifier's Claude-generated text (whatsHappening/talkingPoint/
 // whoToTarget) leans on em dashes as a clause separator, which reads as a
@@ -112,6 +113,7 @@ export default function IntelligenceScreen() {
   const [frameworkFilter, setFrameworkFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
   const [tierFilter, setTierFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
 
   useEffect(() => {
     fetchIntelEvents().then(setEvents).catch((e) => setError(e.message));
@@ -153,7 +155,7 @@ export default function IntelligenceScreen() {
     )
     : (
       <div className="intel-list">
-        {[...filtered].sort(byRecent).map((e) => <IntelCard event={e} key={e.id} />)}
+        {[...filtered].sort(sortOrder === 'oldest' ? byOldest : byNewest).map((e) => <IntelCard event={e} key={e.id} />)}
       </div>
     );
 
@@ -216,6 +218,13 @@ export default function IntelligenceScreen() {
               <option value="">All</option>
               <option value="primary">Confirmed</option>
               <option value="watch">Unconfirmed</option>
+            </select>
+          </label>
+          <label>
+            Sort
+            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
             </select>
           </label>
         </div>
