@@ -29,8 +29,8 @@ test('buildSearchBody uses icp3 employee ranges', () => {
   assert.deepEqual(body.organization_locations, ['Taiwan', 'Singapore', 'South Korea']);
 });
 
-test('buildSearchBody no longer restricts to the industry include-list', () => {
-  const body = buildSearchBody('icp2', 'benelux', 1, 25);
+test('buildSearchBody no longer restricts non-benelux regions to the industry include-list', () => {
+  const body = buildSearchBody('icp2', 'uk', 1, 25);
   assert.equal('organization_industry_tag_ids' in body, false);
 });
 
@@ -46,21 +46,67 @@ test('buildSearchBody keeps the industry exclude-list untouched', () => {
   ]);
 });
 
-test('buildSearchBody adds benelux-only keyword excludes (2026-09-04 quality fix), untouched elsewhere', () => {
-  const BENELUX_ONLY_EXCLUDES = ['education management', 'energy & utilities'];
-
-  const benelux = buildSearchBody('icp1', 'benelux', 1, 25);
-  for (const kw of BENELUX_ONLY_EXCLUDES) {
-    assert.ok(benelux.q_not_organization_keyword_tags.includes(kw), `benelux missing exclude: ${kw}`);
+// 2026-09-09 — benelux switched from the shared keyword-tag/person-title
+// targeting to an industry-tag-based recipe (live-tested at 30 companies,
+// 76.7% qualify rate vs. ~46% aggregate baseline — see
+// backend/scripts/research_industry_filter_test.js). Every other region is
+// untouched by this: it's a benelux-only override, not a change to
+// COMMON_FILTERS.
+test('buildSearchBody gives benelux an industry include-list, for every ICP profile', () => {
+  for (const profile of ['icp1', 'icp2', 'icp3']) {
+    const body = buildSearchBody(profile, 'benelux', 1, 25);
+    assert.deepEqual(body.organization_industry_tag_ids, [
+      '5567cd4773696439b10b0000', // information technology & services
+      '5567cd4e7369643b70010000', // computer software
+    ], `${profile} missing benelux industry include-list`);
   }
-  // The shared exclude list underneath is still there too, untouched.
-  assert.ok(benelux.q_not_organization_keyword_tags.includes('management consulting'));
+});
 
+test('buildSearchBody keeps the shared industry exclude-list for benelux too', () => {
+  const body = buildSearchBody('icp1', 'benelux', 1, 25);
+  assert.deepEqual(body.organization_not_industry_tag_ids, [
+    '5567cd467369644d39040000',
+    '5567e09973696410db020800',
+    '5567cdd47369643dbf260000',
+    '5567cd8e7369645409450000',
+    '5567d1127261697f2b1d0000',
+    '5567ce987369643b789e0000',
+  ]);
+});
+
+test('buildSearchBody drops keyword-tag and person-title targeting for benelux', () => {
+  for (const profile of ['icp1', 'icp2', 'icp3']) {
+    const body = buildSearchBody(profile, 'benelux', 1, 25);
+    assert.equal('q_organization_keyword_tags' in body, false, `${profile} should have no keyword include-tags`);
+    assert.equal('q_not_organization_keyword_tags' in body, false, `${profile} should have no keyword exclude-tags`);
+    assert.equal('included_organization_keyword_fields' in body, false, `${profile} should have no keyword fields`);
+    assert.equal('excluded_organization_keyword_fields' in body, false, `${profile} should have no keyword fields`);
+    assert.equal('person_titles' in body, false, `${profile} should have no person_titles filter`);
+  }
+});
+
+test('buildSearchBody keeps benelux employee ranges, market segments, net-new, and full geo untouched per profile', () => {
+  const icp1 = buildSearchBody('icp1', 'benelux', 1, 25);
+  assert.deepEqual(icp1.organization_num_employees_ranges, ['1,10', '11,20', '21,50']);
+  const icp2 = buildSearchBody('icp2', 'benelux', 1, 25);
+  assert.deepEqual(icp2.organization_num_employees_ranges, ['51,100', '101,200', '201,250']);
+  const icp3 = buildSearchBody('icp3', 'benelux', 1, 25);
+  assert.deepEqual(icp3.organization_num_employees_ranges, ['251,500', '501,1000', '1001,5000', '5001,10000', '10001,']);
+
+  for (const body of [icp1, icp2, icp3]) {
+    assert.deepEqual(body.market_segments, ['b2b', 'saas']);
+    assert.deepEqual(body.prospected_by_current_team, ['no']);
+    assert.deepEqual(body.organization_locations, ['Luxembourg', 'Netherlands', 'Belgium']);
+  }
+});
+
+test('buildSearchBody leaves every non-benelux region on the shared keyword-tag targeting, unaffected by the benelux override', () => {
   for (const region of ['uk', 'us', 'nordics', 'dach', 'aus', 'poland', 'taiwan', 'southafrica']) {
     const body = buildSearchBody('icp1', region, 1, 25);
-    for (const kw of BENELUX_ONLY_EXCLUDES) {
-      assert.equal(body.q_not_organization_keyword_tags.includes(kw), false, `${region} should not have benelux-only exclude: ${kw}`);
-    }
+    assert.ok(Array.isArray(body.q_organization_keyword_tags) && body.q_organization_keyword_tags.length > 0, `${region} should still have keyword include-tags`);
+    assert.ok(Array.isArray(body.q_not_organization_keyword_tags) && body.q_not_organization_keyword_tags.length > 0, `${region} should still have keyword exclude-tags`);
+    assert.ok(Array.isArray(body.person_titles) && body.person_titles.length > 0, `${region} should still have person_titles`);
+    assert.equal('organization_industry_tag_ids' in body, false, `${region} should not have an industry include-list`);
   }
 });
 

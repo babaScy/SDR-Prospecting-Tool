@@ -127,12 +127,10 @@ const COMMON_FILTERS = {
 // management, mechanical or industrial engineering) had comparable or better
 // retrospective ratios but cut the live pool by 20-49% combined — too
 // aggressive for what was asked ("without reducing the region size too much").
-const REGION_KEYWORD_EXCLUDES = {
-  benelux: [
-    'education management',
-    'energy & utilities',
-  ],
-};
+// benelux no longer uses keyword-tag filtering at all (see BENELUX_FILTERS
+// below), so its entry here is retired — this map is empty until another
+// region needs a keyword-exclude tweak of its own.
+const REGION_KEYWORD_EXCLUDES = {};
 
 const ICP1_FILTERS = {
   ...COMMON_FILTERS,
@@ -149,4 +147,42 @@ const ICP3_FILTERS = {
   organization_num_employees_ranges: ['251,500', '501,1000', '1001,5000', '5001,10000', '10001,'],
 };
 
-module.exports = { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS, REGION_KEYWORD_EXCLUDES };
+// benelux-only override (2026-09-09) — replaces the shared keyword-tag/
+// person-title targeting above with an industry-tag-based recipe instead.
+// Live-tested at 30 companies pulled+qualified through the real ICP rubric:
+// 76.7% qualified vs. ~46% aggregate baseline across other regions on the
+// old keyword-tag filters (see backend/scripts/research_industry_filter_test.js,
+// throwaway per the research_v2_*.js convention). Employee-range bands are
+// unchanged — still per-ICP-profile, same as everywhere else.
+//
+// organization_industry_tag_ids ids below were NOT guessable from anything
+// in this repo (only the exclude-list ids were already known) — resolved
+// live from Apollo's own UI network request, not assumed:
+//   5567cd4773696439b10b0000 -> "information technology & services"
+//   5567cd4e7369643b70010000 -> "computer software"
+//
+// prospected_by_current_team is kept even though it wasn't one of the
+// categories being tested — dropping it makes Apollo split matches across
+// separate `organizations`/`accounts` response arrays instead of one, which
+// breaks collectBatch's page/offset math (it assumes a single
+// `organizations` array of exactly `per_page` items). Every other region
+// already carries this filter; benelux keeps it too.
+const BENELUX_FILTERS = {
+  prospected_by_current_team: ['no'],
+  market_segments: ['b2b', 'saas'],
+  organization_industry_tag_ids: [
+    '5567cd4773696439b10b0000', // information technology & services
+    '5567cd4e7369643b70010000', // computer software
+  ],
+  organization_not_industry_tag_ids: COMMON_FILTERS.organization_not_industry_tag_ids, // unchanged, shared
+};
+
+const BENELUX_ICP_FILTERS = {
+  icp1: { ...BENELUX_FILTERS, organization_num_employees_ranges: ICP1_FILTERS.organization_num_employees_ranges },
+  icp2: { ...BENELUX_FILTERS, organization_num_employees_ranges: ICP2_FILTERS.organization_num_employees_ranges },
+  icp3: { ...BENELUX_FILTERS, organization_num_employees_ranges: ICP3_FILTERS.organization_num_employees_ranges },
+};
+
+module.exports = {
+  ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS, REGION_KEYWORD_EXCLUDES, BENELUX_ICP_FILTERS,
+};

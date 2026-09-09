@@ -1,5 +1,7 @@
 const axios = require('axios');
-const { ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS, REGION_KEYWORD_EXCLUDES } = require('../config/filters');
+const {
+  ICP1_FILTERS, ICP2_FILTERS, ICP3_FILTERS, REGIONS, REGION_KEYWORD_EXCLUDES, BENELUX_ICP_FILTERS,
+} = require('../config/filters');
 
 const PROFILE_FILTERS = { icp1: ICP1_FILTERS, icp2: ICP2_FILTERS, icp3: ICP3_FILTERS };
 
@@ -13,10 +15,19 @@ const apolloHeaders = () => ({
 });
 
 const buildSearchBody = (profile, region, page, perPage) => {
-  const baseFilters = PROFILE_FILTERS[profile];
-  if (!baseFilters) throw new Error(`Unknown profile: ${profile}`);
   const locations = REGIONS[region];
   if (!locations) throw new Error(`Unknown region: ${region}`);
+
+  // benelux uses a different targeting recipe entirely (industry tags, no
+  // keyword tags/titles) instead of COMMON_FILTERS — see BENELUX_ICP_FILTERS.
+  if (region === 'benelux') {
+    const beneluxFilters = BENELUX_ICP_FILTERS[profile];
+    if (!beneluxFilters) throw new Error(`Unknown profile: ${profile}`);
+    return { page, per_page: perPage, ...beneluxFilters, organization_locations: locations };
+  }
+
+  const baseFilters = PROFILE_FILTERS[profile];
+  if (!baseFilters) throw new Error(`Unknown profile: ${profile}`);
   const regionExcludes = REGION_KEYWORD_EXCLUDES[region] || [];
   return {
     page, per_page: perPage, ...baseFilters,
