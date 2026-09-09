@@ -6,7 +6,7 @@ const quotaService = require('./quotaService');
 const { makeLimiter } = require('../util/limiter');
 const {
   APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, getDailyQuota, SESSION_MAX_PULLED,
-  MAX_CONSECUTIVE_EMPTY_ROUNDS,
+  MAX_CONSECUTIVE_EMPTY_ITEMS,
 } = require('../config/pullConfig');
 
 const QUALIFY_CHUNK_SIZE = 30;
@@ -128,19 +128,35 @@ async function collectBatch(list, k, { search, enrich }) {
   return saved;
 }
 
-// Admin path: loop collectBatch toward requestedCount, stopping when a round
-// saves 0 (pool exhausted) so we never spin forever on a thin region.
+// Admin path: loop collectBatch toward requestedCount, giving up once
+// MAX_CONSECUTIVE_EMPTY_ITEMS candidates in a row turned out to already
+// exist, so we never spin forever on a thin region. A single all-dupe round
+// isn't proof of exhaustion by itself — see MAX_CONSECUTIVE_EMPTY_ITEMS'
+// comment in pullConfig.js (the shared cursor wraps once a region/profile's
+// pool has been fully walked, and dedup-skips on a wrapped, re-walked
+// stretch look identical to a genuinely dry pool unless given enough items
+// to walk past it).
 async function collectCompanies(list, { search, enrich }) {
   // Seeded from list.pulledCount (not 0) so a resumed run after a server
   // restart tops up toward requestedCount instead of over-pulling on top of
   // whatever an earlier, interrupted run already saved.
   let saved = list.pulledCount || 0;
+  let consecutiveEmptyItems = 0;
   while (saved < list.requestedCount) {
-    const round = await collectBatch(list, list.requestedCount - saved, { search, enrich });
+    const want = list.requestedCount - saved;
+    const round = await collectBatch(list, want, { search, enrich });
     saved += round;
     await List.findByIdAndUpdate(list._id, { $set: { pulledCount: saved } });
     await logProgress(list._id, `Pulled ${saved}/${list.requestedCount} new companies...`);
-    if (round === 0) break; // no new companies available this pass
+    if (round === 0) {
+      consecutiveEmptyItems += want;
+      if (consecutiveEmptyItems >= MAX_CONSECUTIVE_EMPTY_ITEMS) {
+        await logProgress(list._id, `No new companies after checking ${consecutiveEmptyItems} candidates — pool exhausted for this region/profile.`);
+        break;
+      }
+    } else {
+      consecutiveEmptyItems = 0;
+    }
   }
   return saved;
 }
@@ -162,7 +178,7 @@ async function runQuotaPull(list, deps = {}) {
   // of redoing the FIRST_BATCH_SIZE first-batch round on top of it.
   let pulledThisSession = list.pulledCount || 0;
   let round = pulledThisSession > 0 ? 1 : 0;
-  let emptyRounds = 0;
+  let consecutiveEmptyItems = 0;
 
   while (true) {
     const already = await qualifiedToday(sdr, list.region);
@@ -190,14 +206,16 @@ async function runQuotaPull(list, deps = {}) {
       // A single empty round just means the handful of items reserved this
       // round happened to be dupes/enrich failures — not proof the pool is
       // dry, especially near quota where a round can be as small as 1 item.
-      // Only give up after several in a row.
-      emptyRounds++;
-      if (emptyRounds >= MAX_CONSECUTIVE_EMPTY_ROUNDS) {
-        await logProgress(list._id, `No new companies after ${emptyRounds} empty rounds — pool exhausted for this region/profile.`);
+      // Tracked in items checked (k), not rounds — see MAX_CONSECUTIVE_EMPTY_ITEMS'
+      // comment in pullConfig.js for why a round-count budget isn't enough
+      // once the shared cursor has wrapped into an already-covered stretch.
+      consecutiveEmptyItems += k;
+      if (consecutiveEmptyItems >= MAX_CONSECUTIVE_EMPTY_ITEMS) {
+        await logProgress(list._id, `No new companies after checking ${consecutiveEmptyItems} candidates — pool exhausted for this region/profile.`);
         break;
       }
     } else {
-      emptyRounds = 0;
+      consecutiveEmptyItems = 0;
     }
   }
 

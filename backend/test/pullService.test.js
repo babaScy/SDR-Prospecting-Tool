@@ -145,6 +145,33 @@ test('collectCompanies stops after pool exhaustion (no infinite loop)', async ()
   assert.equal(saved, 3);
 });
 
+// 2026-09-09 — reproduces the benelux/icp1 false "pool exhausted" bug: the
+// shared cursor has already lapped this region/profile's pool once (next
+// wrapped back to position 0), and the first ~40 of 60 positions were fully
+// saved on that earlier pass. A round-count budget (the old
+// MAX_CONSECUTIVE_EMPTY_ROUNDS: 3, ~15 items at this k) gives up long before
+// reaching the 20 genuinely fresh companies at positions 40-59. The item-count
+// budget (MAX_CONSECUTIVE_EMPTY_ITEMS: 200) has enough runway to walk past
+// the covered stretch and find them.
+test('collectCompanies walks past an already-covered wrapped stretch instead of giving up early', async () => {
+  const key = 'apolloPage_icp1_uk';
+  const pool = Array.from({ length: 60 }, (_, i) => `w${i}`);
+
+  const oldList = await makeList({ name: 'earlier pass' });
+  for (let i = 0; i < 40; i++) {
+    await Company.create({ apolloAccountId: `w${i}`, companyName: `Co w${i}`, listId: oldList._id });
+  }
+  // Cursor already lapped once: next=60 on a totalItems=60 pool wraps to
+  // position 0 — right at the start of the already-covered 0-39 stretch.
+  await PipelineState.create({ key, value: { next: 60, perPage: 25, totalItems: 60 } });
+
+  const list = await makeList({ requestedCount: 5 });
+  const saved = await collectCompanies(list, { search: fakeSearchFlat(pool), enrich: fakeEnrich });
+  assert.equal(saved, 5);
+  const domains = (await Company.find({ listId: list._id })).map((c) => c.apolloAccountId).sort();
+  for (const d of domains) assert.ok(Number(d.slice(1)) >= 40, `expected a fresh (>=40) company, got ${d}`);
+});
+
 test('collectCompanies stores no-domain companies as disqualified', async () => {
   const list = await makeList({ requestedCount: 1 });
   const noDomain = { id: 'x', name: 'Ghost Co', website_url: null, primary_domain: null };
@@ -342,6 +369,60 @@ test('runQuotaPull: a single empty round does not give up early when the pool ha
   const fresh = await List.findById(list._id);
   assert.equal(fresh.status, 'ready');
   assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
+});
+
+// 2026-09-09 — the real Katie/benelux failure, reproduced exactly: shared
+// cursor already lapped this region/profile once (wraps to position 0 on a
+// totalItems=60 pool), the first 40 of 60 positions were fully covered on an
+// earlier pass, and quota-mode's own round sizes match what actually
+// happened (10, then 5, then 5, ...). The old MAX_CONSECUTIVE_EMPTY_ROUNDS:3
+// gives up after exactly those first 3 rounds (only 20 items checked) —
+// before ever reaching the 20 genuinely fresh companies starting at index
+// 40. The item-count budget walks past them instead.
+test('runQuotaPull walks past an already-covered wrapped stretch instead of falsely reporting the pool exhausted', async () => {
+  const key = 'apolloPage_icp1_nordics';
+  const pool = Array.from({ length: 60 }, (_, i) => `n${i}`);
+
+  const oldList = await makeList({ name: 'earlier pass', region: 'nordics' });
+  for (let i = 0; i < 40; i++) {
+    await Company.create({ apolloAccountId: `n${i}`, companyName: `Co n${i}`, listId: oldList._id });
+  }
+  await PipelineState.create({ key, value: { next: 60, perPage: 25, totalItems: 60 } });
+
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, region: 'nordics' });
+  const deps = {
+    search: fakeSearchFlat(pool),
+    enrich: fakeEnrich,
+    qualify: async (companies) => {
+      for (const c of companies) await Company.findByIdAndUpdate(c._id, { $set: { status: 'qualified' } });
+      return new Map();
+    },
+  };
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(await Company.countDocuments({ listId: list._id, status: 'qualified' }), 5);
+  assert.ok(!fresh.progressLog.some((m) => /pool exhausted/.test(m)), 'should not have given up early');
+});
+
+test('runQuotaPull still gives up (bounded, no infinite loop) once genuinely no fresh companies remain', async () => {
+  const key = 'apolloPage_icp1_nordics';
+  const TOTAL = 250; // comfortably past MAX_CONSECUTIVE_EMPTY_ITEMS (200)
+  const pool = Array.from({ length: TOTAL }, (_, i) => `x${i}`);
+
+  const oldList = await makeList({ name: 'fully covered', region: 'nordics' });
+  for (let i = 0; i < TOTAL; i++) {
+    await Company.create({ apolloAccountId: `x${i}`, companyName: `Co x${i}`, listId: oldList._id });
+  }
+  await PipelineState.create({ key, value: { next: TOTAL, perPage: 25, totalItems: TOTAL } });
+
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, region: 'nordics' });
+  const deps = { search: fakeSearchFlat(pool), enrich: fakeEnrich, qualify: async () => new Map() };
+  await runPull(list._id, deps);
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(await Company.countDocuments({ listId: list._id }), 0);
+  assert.ok(fresh.progressLog.some((m) => /pool exhausted/.test(m)), 'should have reported exhaustion');
 });
 
 test('collectBatch refreshes a stale cached totalItems instead of wrapping into already-pulled items', async () => {
