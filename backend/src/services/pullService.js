@@ -226,9 +226,14 @@ async function runQuotaPull(list, deps = {}) {
 async function runPull(listId, deps = {}) {
   const search = deps.search || apollo.searchCompaniesPage;
   const enrich = deps.enrich || apollo.enrichOrganization;
-  // Lazy default: qualifierService is built in Task 4 and needs ANTHROPIC_API_KEY.
-  const qualifyBatch =
-    deps.qualifyBatch || ((...args) => require('./qualifierService').qualifyCompaniesBatch(...args));
+  // Mode-aware dispatcher (same one runQuotaPull uses) — picks sync vs. the
+  // Batches API per the admin-configured qualification-mode setting (and
+  // always sync under SYNC_THRESHOLD regardless of that setting). This used
+  // to hardcode qualifyCompaniesBatch directly, which ignored the setting
+  // entirely — an admin/fixed pull always went to the (slow) Batches API no
+  // matter what "single mode" was set to. Lazy default: qualifierService
+  // needs ANTHROPIC_API_KEY.
+  const qualify = deps.qualify || ((...args) => require('./qualifierService').qualifyCompanies(...args));
 
   try {
     const list = await List.findById(listId);
@@ -251,7 +256,7 @@ async function runPull(listId, deps = {}) {
         listId,
         `Qualifying batch ${i / QUALIFY_CHUNK_SIZE + 1}/${chunks} (${chunk.length} companies)...`
       );
-      await qualifyBatch(chunk, (msg) => logProgress(listId, msg));
+      await qualify(chunk, (msg) => logProgress(listId, msg));
     }
 
     await List.findByIdAndUpdate(listId, { $set: { status: 'ready' } });

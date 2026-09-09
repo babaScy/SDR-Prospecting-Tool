@@ -191,7 +191,7 @@ test('runPull ends with status ready and qualifies pending companies', async () 
   await runPull(list._id, {
     search: fakeSearchFlat(['a', 'b']),
     enrich: fakeEnrich,
-    qualifyBatch: async (companies) => { qualified.push(...companies.map((c) => c.apolloAccountId)); },
+    qualify: async (companies) => { qualified.push(...companies.map((c) => c.apolloAccountId)); },
   });
   const fresh = await List.findById(list._id);
   assert.equal(fresh.status, 'ready');
@@ -204,11 +204,29 @@ test('runPull marks list failed and stores error when a step throws', async () =
   await runPull(list._id, {
     search: async () => { throw new Error('apollo exploded'); },
     enrich: fakeEnrich,
-    qualifyBatch: async () => {},
+    qualify: async () => {},
   });
   const fresh = await List.findById(list._id);
   assert.equal(fresh.status, 'failed');
   assert.match(fresh.error, /apollo exploded/);
+});
+
+// 2026-09-09 — the admin/fixed pull path used to hardcode
+// qualifyCompaniesBatch (the raw Batches-API function), ignoring the
+// admin-configurable qualification-mode setting entirely — unlike
+// runQuotaPull, which already went through the mode-aware qualifyCompanies
+// dispatcher. This is why a "single mode" setting had no effect on an
+// admin-assigned pull: it always went to the (slow) Batches API regardless.
+// runPull must now go through the same dispatcher runQuotaPull uses.
+test('runPull routes qualification through the mode-aware dispatcher, not a hardcoded batch call', async () => {
+  const list = await makeList({ requestedCount: 2 });
+  let calledWith = null;
+  await runPull(list._id, {
+    search: fakeSearchFlat(['a', 'b']),
+    enrich: fakeEnrich,
+    qualify: async (companies, onLog) => { calledWith = { count: companies.length, hasOnLog: typeof onLog === 'function' }; },
+  });
+  assert.deepEqual(calledWith, { count: 2, hasOnLog: true });
 });
 
 test('logProgress caps progressLog at 50 entries', async () => {
