@@ -42,4 +42,16 @@ module.exports = {
   ENRICH_CONCURRENCY: 5,
   APOLLO_PER_PAGE: 25,
   RESET_TZ: 'Asia/Jerusalem',
+  // How long a pull/qualify job's lock on its List can sit unrefreshed before
+  // another process is allowed to take it over. 2026-09-10: a dev-server
+  // restart didn't fully kill the old process before the new one's
+  // resumeStaleLists() resumed the same still-running list, so two workers
+  // pulled/qualified it at once — duplicate qualifier calls, and a
+  // `pulledCount` write race left the list showing fewer pulled than were
+  // actually saved (see pullService.claimList). Set generously above the
+  // worst-case gap between heartbeats (a single Batches-API qualify() call
+  // can run for many minutes with no intermediate logProgress) so a merely
+  // slow job is never mistaken for a dead one — a real crash still recovers
+  // well within a workday.
+  LOCK_STALE_MS: 30 * 60 * 1000,
 };

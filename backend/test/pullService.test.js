@@ -4,9 +4,9 @@ const db = require('./helpers/db');
 const List = require('../src/models/List');
 const Company = require('../src/models/Company');
 const PipelineState = require('../src/models/PipelineState');
-const { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, resumeStaleLists } =
+const { runPull, collectCompanies, collectBatch, reserveItems, readCursor, logProgress, resumeStaleLists, claimList } =
   require('../src/services/pullService');
-const { SESSION_MAX_PULLED } = require('../src/config/pullConfig');
+const { SESSION_MAX_PULLED, LOCK_STALE_MS } = require('../src/config/pullConfig');
 
 before(async () => db.connect());
 after(async () => db.disconnect());
@@ -485,4 +485,91 @@ test('collectCompanies skips orgs when enrich throws, continues with others', as
   } finally {
     console.error = originalError;
   }
+});
+
+// 2026-09-10 — reproduces the benelux/icp1 double-run bug: a dev-server
+// restart didn't fully kill the old process before the new one's
+// resumeStaleLists() re-ran the same still-in-progress list, so two workers
+// pulled/qualified it at once. Each kept its own local pulledCount and
+// `$set` (not `$inc`) it independently, so the list ended up showing 16
+// pulled while 25 companies had actually been saved to the DB. claimList
+// gives each list a single live owner at a time so this can't happen.
+test('claimList claims a list with no existing lock', async () => {
+  const list = await makeList();
+  const claimed = await claimList(list._id);
+  assert.equal(claimed, true);
+  const fresh = await List.findById(list._id);
+  assert.ok(fresh.lockedAt, 'should stamp a heartbeat on claim');
+});
+
+test('claimList refuses a list whose lock is still fresh (owner presumed alive)', async () => {
+  const list = await makeList();
+  await List.findByIdAndUpdate(list._id, { $set: { lockedBy: 'other-worker', lockedAt: new Date() } });
+  const claimed = await claimList(list._id);
+  assert.equal(claimed, false);
+});
+
+test('claimList reclaims a list whose lock has gone stale (owner presumed dead)', async () => {
+  const list = await makeList();
+  const staleAt = new Date(Date.now() - LOCK_STALE_MS - 1000);
+  await List.findByIdAndUpdate(list._id, { $set: { lockedBy: 'dead-worker', lockedAt: staleAt } });
+  const claimed = await claimList(list._id);
+  assert.equal(claimed, true);
+});
+
+test('runPull is a no-op when another live worker already holds the lock', async () => {
+  const list = await makeList({ pullMode: 'quota', requestedCount: 5, status: 'qualifying', pulledCount: 3 });
+  await List.findByIdAndUpdate(list._id, { $set: { lockedBy: 'other-live-worker', lockedAt: new Date() } });
+
+  let searchCalled = false;
+  await runPull(list._id, {
+    search: async (...args) => { searchCalled = true; return fakeSearchFlat(['a', 'b', 'c'])(...args); },
+    enrich: fakeEnrich,
+    qualify: async () => new Map(),
+  });
+
+  assert.equal(searchCalled, false, 'a locked-out run must not touch Apollo at all');
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'qualifying', 'status must be left alone for the live owner to finish');
+  assert.equal(fresh.pulledCount, 3, 'pulledCount must not be touched by the locked-out run');
+});
+
+test('runPull takes over a genuinely stale lock (crash recovery still works)', async () => {
+  const list = await makeList({ requestedCount: 2, status: 'qualifying' });
+  const staleAt = new Date(Date.now() - LOCK_STALE_MS - 1000);
+  await List.findByIdAndUpdate(list._id, { $set: { lockedBy: 'dead-worker', lockedAt: staleAt } });
+
+  await runPull(list._id, {
+    search: fakeSearchFlat(['a', 'b']),
+    enrich: fakeEnrich,
+    qualify: async () => {},
+  });
+
+  const fresh = await List.findById(list._id);
+  assert.equal(fresh.status, 'ready');
+  assert.equal(fresh.pulledCount, 2);
+});
+
+test('runPull releases its lock once finished, whether it succeeds or fails', async () => {
+  const okList = await makeList({ requestedCount: 1 });
+  await runPull(okList._id, { search: fakeSearchFlat(['a']), enrich: fakeEnrich, qualify: async () => {} });
+  assert.equal((await List.findById(okList._id)).lockedBy, undefined);
+
+  const failList = await makeList();
+  await runPull(failList._id, {
+    search: async () => { throw new Error('boom'); },
+    enrich: fakeEnrich,
+    qualify: async () => {},
+  });
+  assert.equal((await List.findById(failList._id)).lockedBy, undefined);
+});
+
+test('logProgress refreshes the lock heartbeat', async () => {
+  const list = await makeList();
+  await claimList(list._id);
+  const before = (await List.findById(list._id)).lockedAt;
+  await new Promise((r) => setTimeout(r, 5));
+  await logProgress(list._id, 'tick');
+  const after = (await List.findById(list._id)).lockedAt;
+  assert.ok(after > before, 'logProgress should bump lockedAt so a long-running job stays claimed');
 });

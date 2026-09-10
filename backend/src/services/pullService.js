@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const List = require('../models/List');
 const Company = require('../models/Company');
 const PipelineState = require('../models/PipelineState');
@@ -6,7 +7,7 @@ const quotaService = require('./quotaService');
 const { makeLimiter } = require('../util/limiter');
 const {
   APOLLO_PER_PAGE, ENRICH_CONCURRENCY, FIRST_BATCH_SIZE, getDailyQuota, SESSION_MAX_PULLED,
-  MAX_CONSECUTIVE_EMPTY_ITEMS,
+  MAX_CONSECUTIVE_EMPTY_ITEMS, LOCK_STALE_MS,
 } = require('../config/pullConfig');
 
 const QUALIFY_CHUNK_SIZE = 30;
@@ -14,10 +15,48 @@ const QUALIFY_CHUNK_SIZE = 30;
 // Shared across all pulls in this process — bounds concurrent Apollo enrich calls.
 const enrichLimiter = makeLimiter(ENRICH_CONCURRENCY);
 
+// One id per process, used to tell "this worker's own lock" apart from
+// another worker's when claiming/releasing a list — see claimList.
+const WORKER_ID = crypto.randomUUID();
+
+// Atomically claims listId for this worker. Returns false when another
+// worker's lock is still fresh (that list is genuinely being worked on
+// elsewhere right now) — the caller must treat that as a no-op, not an
+// error. A lock older than LOCK_STALE_MS is treated as abandoned (its owner
+// crashed rather than merely being slow) and can be reclaimed. This is what
+// stops two workers from pulling/qualifying the same list at once — see the
+// LOCK_STALE_MS comment in pullConfig.js for the incident this fixes.
+async function claimList(listId) {
+  const staleBefore = new Date(Date.now() - LOCK_STALE_MS);
+  const claimed = await List.findOneAndUpdate(
+    {
+      _id: listId,
+      $or: [
+        { lockedBy: { $exists: false } },
+        { lockedBy: WORKER_ID },
+        { lockedAt: { $lt: staleBefore } },
+      ],
+    },
+    { $set: { lockedBy: WORKER_ID, lockedAt: new Date() } },
+    { new: true }
+  );
+  return Boolean(claimed);
+}
+
+// Only clears the lock if this worker still holds it — a worker whose lock
+// went stale while it was in fact still running must not clear the new
+// owner's lock out from under it.
+async function releaseLock(listId) {
+  await List.updateOne({ _id: listId, lockedBy: WORKER_ID }, { $unset: { lockedBy: '', lockedAt: '' } });
+}
+
 async function logProgress(listId, message) {
   console.log(`[pull] ${message}`);
   await List.findByIdAndUpdate(listId, {
-    $set: { lastMessage: message },
+    // lockedAt doubles as a heartbeat: refreshing it on every progress update
+    // keeps a genuinely still-running job from going stale and being
+    // reclaimed out from under it mid-run.
+    $set: { lastMessage: message, lockedAt: new Date() },
     $push: { progressLog: { $each: [message], $slice: -50 } },
   });
 }
@@ -235,6 +274,11 @@ async function runPull(listId, deps = {}) {
   // needs ANTHROPIC_API_KEY.
   const qualify = deps.qualify || ((...args) => require('./qualifierService').qualifyCompanies(...args));
 
+  if (!(await claimList(listId))) {
+    console.log(`[pull] list ${listId} is already being worked on by another live process — skipping.`);
+    return;
+  }
+
   try {
     const list = await List.findById(listId);
     if (!list) throw new Error(`List ${listId} not found`);
@@ -265,6 +309,8 @@ async function runPull(listId, deps = {}) {
     console.error(`[pull] list ${listId} failed: ${err.message}`);
     await List.findByIdAndUpdate(listId, { $set: { status: 'failed', error: err.message } });
     await logProgress(listId, `Pull failed: ${err.message}`);
+  } finally {
+    await releaseLock(listId);
   }
 }
 
@@ -276,7 +322,12 @@ async function runPull(listId, deps = {}) {
 // re-running them from here just continues where the crash left off — a
 // crash only costs whichever single company was mid-flight at that instant,
 // not the whole list (see 2026-09-07 investigation: a Benelux SDR's list hit
-// this exact path and lost nothing — it had already reached quota). Contact
+// this exact path and lost nothing — it had already reached quota).
+// runPull's claimList guard makes this safe even when the old process hasn't
+// actually died yet (e.g. a dev restart that doesn't kill it before this
+// runs) — a stranded list whose lock is still fresh is skipped here rather
+// than being worked twice at once (2026-09-10: this exact race left a
+// Benelux list's pulledCount showing fewer than were actually saved). Contact
 // sourcing ('sourcing' status) isn't resumable yet, so those are still
 // flipped to failed as before.
 async function resumeStaleLists(deps = {}) {
@@ -302,4 +353,5 @@ module.exports = {
   readCursor,
   logProgress,
   resumeStaleLists,
+  claimList,
 };

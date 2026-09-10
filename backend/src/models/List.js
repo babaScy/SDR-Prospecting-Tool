@@ -21,6 +21,13 @@ const listSchema = new mongoose.Schema(
       default: 'pulling',
     },
     reviewConfirmedAt: { type: Date }, // SDR locked their accept/reject decisions
+    // Opaque id of the in-process worker currently running this list's
+    // pull/qualify job, plus a heartbeat timestamp — guards against a second
+    // worker (e.g. a dev-server restart that resumes a still-running list
+    // before the old process has fully exited) processing the same list at
+    // once. See pullService.claimList.
+    lockedBy: { type: String },
+    lockedAt: { type: Date },
     lastMessage: { type: String, default: '' },
     progressLog: { type: [String], default: [] }, // capped at last 50 via $slice on push
     error: { type: String },
