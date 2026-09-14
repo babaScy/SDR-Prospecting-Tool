@@ -171,136 +171,144 @@ export default function ListTable({ listId, onDecision }) {
   if (!leads) return <p className="muted">Loading…</p>;
 
   return (
-    <div className="panel">
-      <div className="form-row" style={{ marginBottom: 12 }}>
-        <label>
-          AI Verdict
-          <select value={verdictFilter} onChange={(e) => setVerdictFilter(e.target.value)}>
-            <option value="all">All</option>
-            <option value="qualified">Qualified</option>
-            <option value="nei">Not enough information</option>
-            <option value="disqualified">Disqualified</option>
-            <option value="pending">Pending (AI)</option>
-          </select>
-        </label>
-        <label>
-          SDR Status
-          <select value={sdrFilter} onChange={(e) => setSdrFilter(e.target.value)}>
-            <option value="all">All</option>
-            <option value="pending">Pending</option>
-            <option value="accepted">Accepted</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </label>
-      </div>
-      {selected.size > 0 && (
-        <div className="decision-row" style={{ marginTop: 0, marginBottom: 12, justifyContent: 'space-between' }}>
-          <span className="muted">{selected.size} selected</span>
-          <div className="decision-row" style={{ margin: 0 }}>
-            <button className="btn reject small" onClick={submitBulkReject} disabled={bulkBusy}>
-              <IconX /> Reject {selected.size} selected
-            </button>
-            <button className="btn ghost small" onClick={() => setSelected(new Set())} disabled={bulkBusy}>
-              Clear selection
-            </button>
-          </div>
+    // The override and detail dialogs below are siblings of .panel, not
+    // nested inside it — .panel has backdrop-filter, which (like transform)
+    // makes it a containing block for `position: fixed` descendants. Nested
+    // here, the dialogs would render pinned to .panel's own box instead of
+    // the viewport, opening off-screen below the fold on a long table
+    // instead of centered. Same fix ObjectionModal already relies on.
+    <>
+      <div className="panel">
+        <div className="form-row" style={{ marginBottom: 12 }}>
+          <label>
+            AI Verdict
+            <select value={verdictFilter} onChange={(e) => setVerdictFilter(e.target.value)}>
+              <option value="all">All</option>
+              <option value="qualified">Qualified</option>
+              <option value="nei">Not enough information</option>
+              <option value="disqualified">Disqualified</option>
+              <option value="pending">Pending (AI)</option>
+            </select>
+          </label>
+          <label>
+            SDR Status
+            <select value={sdrFilter} onChange={(e) => setSdrFilter(e.target.value)}>
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="accepted">Accepted</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </label>
         </div>
-      )}
-      {error && <p className="error">{error}</p>}
-      {!rows.length ? (
-        <p className="muted">No companies match these filters.</p>
-      ) : (
-        <table className="table-plain">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  className="checkbox-themed"
-                  checked={allSelected}
-                  onChange={toggleSelectAll}
-                  disabled={!pendingRows.length}
-                  title="Select all pending rows"
-                />
-              </th>
-              {COLUMNS.slice(0, 3).map((col) => (
-                <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
-                  {col.label}
-                  {sort.key === col.key && (
-                    <span className="sort-icon">{sort.dir === 1 ? <IconChevronUp /> : <IconChevronDown />}</span>
-                  )}
+        {selected.size > 0 && (
+          <div className="decision-row" style={{ marginTop: 0, marginBottom: 12, justifyContent: 'space-between' }}>
+            <span className="muted">{selected.size} selected</span>
+            <div className="decision-row" style={{ margin: 0 }}>
+              <button className="btn reject small" onClick={submitBulkReject} disabled={bulkBusy}>
+                <IconX /> Reject {selected.size} selected
+              </button>
+              <button className="btn ghost small" onClick={() => setSelected(new Set())} disabled={bulkBusy}>
+                Clear selection
+              </button>
+            </div>
+          </div>
+        )}
+        {error && <p className="error">{error}</p>}
+        {!rows.length ? (
+          <p className="muted">No companies match these filters.</p>
+        ) : (
+          <table className="table-plain">
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    className="checkbox-themed"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    disabled={!pendingRows.length}
+                    title="Select all pending rows"
+                  />
                 </th>
-              ))}
-              <th>Compliance</th>
-              {COLUMNS.slice(3).map((col) => (
-                <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
-                  {col.label}
-                  {sort.key === col.key && (
-                    <span className="sort-icon">{sort.dir === 1 ? <IconChevronUp /> : <IconChevronDown />}</span>
-                  )}
-                </th>
-              ))}
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((lead) => {
-              const companyHref = getCompanyHref(lead.website);
-              const compliance = complianceBadge(lead.qualification);
-              const noDomain = !hasUsableDomain(lead.website);
-              return (
-              <tr key={lead._id} onClick={(e) => openLead(lead, e)}>
-                <td>
-                  {lead.sdrStatus === 'pending' && (
-                    <input
-                      type="checkbox"
-                      className="checkbox-themed"
-                      checked={selected.has(lead._id)}
-                      onChange={() => toggleRow(lead._id)}
-                    />
-                  )}
-                </td>
-                <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
-                <td>{lead.employees ?? '—'}</td>
-                <td>{lead.country || '—'}</td>
-                <td>
-                  <span
-                    className={`badge compliance-cell ${compliance.compliant ? 'compliant' : 'compliance-unconfirmed'}`}
-                    title={compliance.frameworks || undefined}
-                  >
-                    {compliance.label}
-                  </span>
-                </td>
-                <td><span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span></td>
-                <td><span className={`badge ${lead.sdrStatus}`}>{SDR_LABELS[lead.sdrStatus] || lead.sdrStatus}</span></td>
-                <td>
-                  {lead.sdrStatus === 'pending' ? (
-                    <div className="decision-row" style={{ margin: 0 }}>
-                      <button
-                        className="btn accept small"
-                        onClick={() => decide(lead, 'accepted')}
-                        disabled={busyIds.has(lead._id) || noDomain}
-                        title={noDomain ? 'No domain on Apollo — contacts cannot be sourced' : undefined}
-                      >
-                        <IconCheck /> Accept
-                      </button>
-                      <button className="btn reject small" onClick={() => decide(lead, 'rejected')} disabled={busyIds.has(lead._id)}>
-                        <IconX /> Reject
-                      </button>
-                      {noDomain && <span className="chip muted">no domain</span>}
-                    </div>
-                  ) : (
-                    <button className="btn ghost small" onClick={() => decide(lead, 'pending')} disabled={busyIds.has(lead._id)}>
-                      <IconUndo /> Undo
-                    </button>
-                  )}
-                </td>
+                {COLUMNS.slice(0, 3).map((col) => (
+                  <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
+                    {col.label}
+                    {sort.key === col.key && (
+                      <span className="sort-icon">{sort.dir === 1 ? <IconChevronUp /> : <IconChevronDown />}</span>
+                    )}
+                  </th>
+                ))}
+                <th>Compliance</th>
+                {COLUMNS.slice(3).map((col) => (
+                  <th key={col.key} className="sortable" onClick={() => toggleSort(col.key)}>
+                    {col.label}
+                    {sort.key === col.key && (
+                      <span className="sort-icon">{sort.dir === 1 ? <IconChevronUp /> : <IconChevronDown />}</span>
+                    )}
+                  </th>
+                ))}
+                <th>Actions</th>
               </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {rows.map((lead) => {
+                const companyHref = getCompanyHref(lead.website);
+                const compliance = complianceBadge(lead.qualification);
+                const noDomain = !hasUsableDomain(lead.website);
+                return (
+                  <tr key={lead._id} onClick={(e) => openLead(lead, e)}>
+                    <td>
+                      {lead.sdrStatus === 'pending' && (
+                        <input
+                          type="checkbox"
+                          className="checkbox-themed"
+                          checked={selected.has(lead._id)}
+                          onChange={() => toggleRow(lead._id)}
+                        />
+                      )}
+                    </td>
+                    <td>{companyHref ? <a className="company-link" href={companyHref} target="_blank" rel="noreferrer">{lead.companyName}</a> : lead.companyName}</td>
+                    <td>{lead.employees ?? '—'}</td>
+                    <td>{lead.country || '—'}</td>
+                    <td>
+                      <span
+                        className={`badge compliance-cell ${compliance.compliant ? 'compliant' : 'compliance-unconfirmed'}`}
+                        title={compliance.frameworks || undefined}
+                      >
+                        {compliance.label}
+                      </span>
+                    </td>
+                    <td><span className={`badge ${lead.status}`}>{VERDICT_LABELS[lead.status] || lead.status}</span></td>
+                    <td><span className={`badge ${lead.sdrStatus}`}>{SDR_LABELS[lead.sdrStatus] || lead.sdrStatus}</span></td>
+                    <td>
+                      {lead.sdrStatus === 'pending' ? (
+                        <div className="decision-row" style={{ margin: 0 }}>
+                          <button
+                            className="btn accept small"
+                            onClick={() => decide(lead, 'accepted')}
+                            disabled={busyIds.has(lead._id) || noDomain}
+                            title={noDomain ? 'No domain on Apollo — contacts cannot be sourced' : undefined}
+                          >
+                            <IconCheck /> Accept
+                          </button>
+                          <button className="btn reject small" onClick={() => decide(lead, 'rejected')} disabled={busyIds.has(lead._id)}>
+                            <IconX /> Reject
+                          </button>
+                          {noDomain && <span className="chip muted">no domain</span>}
+                        </div>
+                      ) : (
+                        <button className="btn ghost small" onClick={() => decide(lead, 'pending')} disabled={busyIds.has(lead._id)}>
+                          <IconUndo /> Undo
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
       {override && (
         <div className="overlay" onClick={cancelOverride}>
           <div className="dialog" onClick={(e) => e.stopPropagation()}>
@@ -315,11 +323,11 @@ export default function ListTable({ listId, onDecision }) {
               onChange={(e) => setOverrideComment(e.target.value)}
               placeholder="e.g. AI missed that they're a consultancy, not SaaS"
             />
-            {/* The overlay covers the whole page, including the .panel's own
-                {error && ...} above — without this, a failed confirm (e.g. the
-                backend's 409 when a company has no domain) set `error` correctly
-                but the dialog just sat there with no visible feedback, since the
-                text rendered behind it. */}
+            {/* This overlay is a sibling of .panel (see the comment up top),
+                so it no longer sits over the .panel's own {error && ...} —
+                keep this dialog-local copy so a failed confirm (e.g. the
+                backend's 409 when a company has no domain) is still visible
+                here instead of only on the .panel underneath. */}
             {error && <p className="error">{error}</p>}
             <div className="decision-row">
               <button className="btn ghost" onClick={cancelOverride} disabled={busyIds.has(override.lead._id)}>
@@ -337,6 +345,6 @@ export default function ListTable({ listId, onDecision }) {
         </div>
       )}
       {viewingLead && <LeadDetailModal lead={viewingLead} onClose={() => setViewingLead(null)} />}
-    </div>
+    </>
   );
 }
