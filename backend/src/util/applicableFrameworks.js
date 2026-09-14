@@ -70,6 +70,10 @@ function buildHaystack(lead) {
 }
 
 function applicableFrameworks(lead) {
+  // A disqualified company isn't a prospect — nothing to sell it, so nothing
+  // to suggest, regardless of what its industry/geography would otherwise match.
+  if (lead?.status === 'disqualified') return [];
+
   const ctx = {
     text: buildHaystack(lead || {}),
     country: String(lead?.country || '').trim().toLowerCase(),

@@ -90,3 +90,20 @@ test('handles missing/sparse fields without throwing', () => {
   assert.deepEqual(applicableFrameworks({}), ['SOC 2', 'ISO 27001']);
   assert.deepEqual(applicableFrameworks({ qualification: null }), ['SOC 2', 'ISO 27001']);
 });
+
+test('disqualified companies get no framework suggestions, regardless of signals', () => {
+  const lead = {
+    status: 'disqualified',
+    industry: 'Hospital & Health Care',
+    country: 'Germany',
+    qualification: { productDescription: 'Checkout and payment processing for hospitals' },
+  };
+  assert.deepEqual(applicableFrameworks(lead), []);
+});
+
+test('non-disqualified statuses (qualified, nei, pending) still get suggestions', () => {
+  for (const status of ['qualified', 'nei', 'pending', undefined]) {
+    const lead = { status, industry: 'Hospital & Health Care', country: 'United States' };
+    assert.ok(applicableFrameworks(lead).includes('HIPAA'), `expected HIPAA for status ${status}`);
+  }
+});
