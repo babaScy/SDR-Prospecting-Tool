@@ -7,7 +7,7 @@ export default [
   { email: 'jamesb@scytale.ai',      role: 'sdr',   regions: ['benelux', 'uk'] },
   { email: 'chumam@scytale.ai',      role: 'sdr',   regions: ['benelux', 'dach'] },
   { email: 'tylorvw@scytale.ai',     role: 'sdr',   regions: ['benelux', 'uk'] },
-  { email: 'ryane@scytale.ai',       role: 'sdr',   regions: ['benelux', 'uk'] },
+  { email: 'ryane@scytale.ai',       role: 'sdr',   regions: ['benelux', 'uk', 'dach'] },
   { email: 'khadym@scytale.ai',      role: 'sdr',   regions: ['benelux', 'uk'] },
   { email: 'jillianl@scytale.ai',    role: 'sdr',   regions: ['dach', 'nordics'] },
   { email: 'davidv@scytale.ai',      role: 'sdr',   regions: ['dach', 'uk'] },
