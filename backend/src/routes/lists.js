@@ -4,6 +4,7 @@ const List = require('../models/List');
 const Company = require('../models/Company');
 const Contact = require('../models/Contact');
 const contactService = require('../services/contactService');
+const { applicableFrameworks } = require('../util/applicableFrameworks');
 
 const router = express.Router();
 
@@ -83,7 +84,9 @@ router.get('/:id/leads', async (req, res, next) => {
     const leads = await Company.find(query)
       .sort({ companyName: 1 })
       .lean();
-    res.json(leads);
+    // Computed on read, not stored — cheap/deterministic, and stays current
+    // if the rules in applicableFrameworks.js change later.
+    res.json(leads.map((lead) => ({ ...lead, applicableFrameworks: applicableFrameworks(lead) })));
   } catch (err) {
     next(err);
   }

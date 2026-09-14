@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchList, confirmReview } from '../api';
-import { IconArrowLeft, IconTable, IconCards, IconCheck } from '../icons';
+import { IconArrowLeft, IconTable, IconCheck } from '../icons';
 import ListTable from './ListTable';
-import ReviewScreen from './ReviewScreen';
 import ContactsScreen from './ContactsScreen';
 
 export default function ListDetailScreen({ listId, onBack }) {
@@ -21,8 +20,7 @@ export default function ListDetailScreen({ listId, onBack }) {
   // Once review is confirmed the contacts view is the destination — including
   // when sourcing failed part-way, since the contacts found so far are saved.
   const sourced = Boolean(list?.reviewConfirmedAt) || ['sourcing', 'sourced'].includes(list?.status);
-  // Card review has its own confirm gate — only offer it here on the table.
-  const canConfirmHere = list?.status === 'reviewed' && mode === 'table';
+  const canConfirmHere = list?.status === 'reviewed';
   const accepted = list?.counts?.accepted ?? 0;
 
   const doConfirm = async () => {
@@ -50,11 +48,6 @@ export default function ListDetailScreen({ listId, onBack }) {
           <button className={mode === 'table' ? 'active' : ''} onClick={() => setMode('table')}>
             <IconTable /> Table
           </button>
-          {!sourced && (
-            <button className={mode === 'card' ? 'active' : ''} onClick={() => setMode('card')}>
-              <IconCards /> Card review
-            </button>
-          )}
           {sourced && (
             <button className={mode === 'contacts' ? 'active' : ''} onClick={() => setMode('contacts')}>
               Contacts
@@ -79,13 +72,6 @@ export default function ListDetailScreen({ listId, onBack }) {
         </div>
       )}
       {mode === 'table' && <ListTable listId={listId} onDecision={load} />}
-      {mode === 'card' && (
-        <ReviewScreen
-          listId={listId}
-          onBack={onBack}
-          onReviewConfirmed={() => load().then(() => setMode('contacts'))}
-        />
-      )}
       {mode === 'contacts' && <ContactsScreen listId={listId} />}
     </div>
   );

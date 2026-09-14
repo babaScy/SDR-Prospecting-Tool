@@ -4,6 +4,7 @@ import { IconCheck, IconX, IconUndo, IconChevronUp, IconChevronDown } from '../i
 import { getCompanyHref, hasUsableDomain } from '../utils/companyLink';
 import { complianceBadge } from '../utils/compliance';
 import { disagreesWithVerdict } from '../utils/verdict';
+import LeadDetailModal from './LeadDetailModal';
 
 const VERDICT_LABELS = { qualified: 'Qualified', nei: 'Not enough information', disqualified: 'Disqualified', pending: 'Pending' };
 const SDR_LABELS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
@@ -41,6 +42,7 @@ export default function ListTable({ listId, onDecision }) {
   const [overrideComment, setOverrideComment] = useState('');
   const [selected, setSelected] = useState(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [viewingLead, setViewingLead] = useState(null);
 
   useEffect(() => {
     fetchLeads(listId)
@@ -158,6 +160,13 @@ export default function ListTable({ listId, onDecision }) {
     setOverrideComment('');
   };
 
+  // Opens the read-only detail card — but not when the click landed on a
+  // control the row already handles itself (checkbox, company link, actions).
+  const openLead = (lead, e) => {
+    if (e.target.closest('button, a, input')) return;
+    setViewingLead(lead);
+  };
+
   if (error && !leads) return <p className="error">{error}</p>;
   if (!leads) return <p className="muted">Loading…</p>;
 
@@ -240,7 +249,7 @@ export default function ListTable({ listId, onDecision }) {
               const compliance = complianceBadge(lead.qualification);
               const noDomain = !hasUsableDomain(lead.website);
               return (
-              <tr key={lead._id}>
+              <tr key={lead._id} onClick={(e) => openLead(lead, e)}>
                 <td>
                   {lead.sdrStatus === 'pending' && (
                     <input
@@ -327,6 +336,7 @@ export default function ListTable({ listId, onDecision }) {
           </div>
         </div>
       )}
+      {viewingLead && <LeadDetailModal lead={viewingLead} onClose={() => setViewingLead(null)} />}
     </div>
   );
 }

@@ -226,7 +226,6 @@ th .sort-icon { display: inline-flex; vertical-align: -3px; margin-left: 2px; co
 .compliance-cell { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tbody tr { cursor: pointer; transition: background var(--dur-fast); }
 tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
-.table-plain tbody tr { cursor: default; }
 
 /* ── Badges & chips ─────────────────────────────────────────────────────── */
 .badge {
@@ -331,6 +330,7 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .lead-card a { color: var(--scy-indigo-200); text-decoration: none; }
 .lead-card a:hover { color: var(--text); }
 .lead-card-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.applicable-frameworks { margin: 10px 0 0; font-size: 14px; color: var(--text); }
 .reasoning {
   background: var(--panel-2); border-left: 3px solid transparent;
   border-image: var(--grad-brand) 1;
@@ -341,9 +341,6 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .signal .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 4px; }
 .signal .v { font-size: 13px; line-height: 1.45; }
 .decision-row { display: flex; gap: 14px; margin-top: 20px; align-items: center; flex-wrap: wrap; }
-.override-panel { margin-top: 20px; }
-.override-panel label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
-.override-panel .decision-row { margin-top: 12px; }
 
 /* ── Sign in ────────────────────────────────────────────────────────────── */
 .login-wrap {
@@ -433,13 +430,12 @@ tbody tr:hover { background: rgba(97, 98, 245, 0.08); }
 .dialog p { margin: 0 0 12px; line-height: 1.5; color: var(--text-2); }
 .dialog .decision-row { margin-top: 14px; justify-content: flex-end; }
 
-/* Shared by the card-view override panel and the table-view dialog. */
-.override-panel textarea, .dialog textarea {
+.dialog textarea {
   width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; font-family: inherit; resize: vertical;
   transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
-.override-panel textarea:focus, .dialog textarea:focus {
+.dialog textarea:focus {
   outline: none; border-color: var(--primary); box-shadow: var(--glow-indigo-sm);
 }
 

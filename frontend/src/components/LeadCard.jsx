@@ -30,6 +30,12 @@ export default function LeadCard({ lead }) {
         <span className={`badge ${compliance.compliant ? 'compliant' : 'compliance-unconfirmed'}`}>{compliance.label}</span>
       </div>
 
+      {Boolean(lead.applicableFrameworks?.length) && (
+        <div className="applicable-frameworks">
+          <strong>Applicable frameworks: {lead.applicableFrameworks.join(', ')}</strong>
+        </div>
+      )}
+
       {q.reasoning && <div className="reasoning">{q.reasoning}</div>}
       {lead.disqualifyReason && !q.reasoning && <div className="reasoning">{lead.disqualifyReason}</div>}
 
