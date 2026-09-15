@@ -99,7 +99,7 @@ const qualifyCompaniesBatch = async (companies, onLog = () => {}) => {
   const requests = companies.map((company) => ({
     custom_id: company._id.toString(),
     params: {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: 2048,
       system: systemBlocks,
       tools,
@@ -163,7 +163,7 @@ const qualifyCompaniesBatch = async (companies, onLog = () => {}) => {
 async function qualifyOneSync(company) {
   const anthropic = getClient();
   const msg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     max_tokens: 2048,
     system: systemBlocks,
     tools,
