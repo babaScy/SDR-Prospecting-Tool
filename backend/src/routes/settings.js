@@ -4,6 +4,8 @@ const {
   setQualificationMode,
   MODES,
   setMaintenanceMode,
+  getPullingDisabled,
+  setPullingDisabled,
   getFunnelStats,
   setFunnelStats,
 } = require('../services/settingsService');
@@ -38,6 +40,28 @@ router.put('/maintenance-mode', async (req, res, next) => {
   if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be a boolean' });
   try {
     await setMaintenanceMode(enabled);
+    res.json({ enabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Readable by any signed-in user (same pattern as qualification-mode's GET)
+// so the Pull screen can show/disable the form for SDRs too, not just admins.
+router.get('/pulling-disabled', async (req, res, next) => {
+  try {
+    res.json({ enabled: await getPullingDisabled() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/pulling-disabled', async (req, res, next) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be a boolean' });
+  try {
+    await setPullingDisabled(enabled);
     res.json({ enabled });
   } catch (err) {
     next(err);

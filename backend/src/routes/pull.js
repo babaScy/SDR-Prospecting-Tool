@@ -3,6 +3,7 @@ const List = require('../models/List');
 const { REGIONS } = require('../config/filters');
 const pullService = require('../services/pullService');
 const quotaService = require('../services/quotaService');
+const { getPullingDisabled } = require('../services/settingsService');
 const USERS = require('../config/users');
 const { getDailyQuota } = require('../config/pullConfig');
 
@@ -40,6 +41,17 @@ router.get('/quota', async (req, res, next) => {
 });
 
 router.post('/', async (req, res, next) => {
+  try {
+    // Blocks only starting a NEW pull — everything else (viewing/reviewing
+    // existing lists, contacts, HubSpot push) is untouched. Admins can still
+    // start one anyway isn't offered here on purpose: while this is on, a
+    // pull would just fail at the qualify step regardless of role.
+    if (await getPullingDisabled()) {
+      return res.status(503).json({ error: 'Pulling is temporarily disabled — check back shortly.' });
+    }
+  } catch (err) {
+    return next(err);
+  }
   if (req.user.role === 'sdr') return sdrPull(req, res, next);
   return adminPull(req, res, next);
 });

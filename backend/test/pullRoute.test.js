@@ -5,6 +5,7 @@ const db = require('./helpers/db');
 const { sessionCookie } = require('./helpers/auth');
 const List = require('../src/models/List');
 const pullService = require('../src/services/pullService');
+const { setPullingDisabled } = require('../src/services/settingsService');
 const app = require('../src/app');
 
 // Don't let the route fire a real pull during tests.
@@ -161,4 +162,26 @@ test('POST /api/pull serializes concurrent requests (TOCTOU race)', async () => 
   await List.deleteMany({});
   const resC = await admin(request(app).post('/api/pull')).send(body);
   assert.equal(resC.status, 201);
+});
+
+test('POST /api/pull is blocked (503) for an admin while pulling is disabled', async () => {
+  await setPullingDisabled(true);
+  const res = await admin(request(app).post('/api/pull')).send({ profile: 'icp1', region: 'uk', count: 10, assignedTo: 'davidv@scytale.ai' });
+  assert.equal(res.status, 503);
+  assert.equal(runPullCalls.length, 0);
+});
+
+test('POST /api/pull is blocked (503) for an SDR while pulling is disabled', async () => {
+  await setPullingDisabled(true);
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 503);
+  assert.equal(runPullCalls.length, 0);
+});
+
+test('POST /api/pull works again once pulling is re-enabled', async () => {
+  await setPullingDisabled(true);
+  await setPullingDisabled(false);
+  const res = await asSdr(request(app).post('/api/pull')).send({ region: 'uk', profile: 'icp1' });
+  assert.equal(res.status, 201);
+  assert.equal(runPullCalls.length, 1);
 });

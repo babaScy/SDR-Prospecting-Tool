@@ -66,6 +66,35 @@ test('PUT /api/settings/maintenance-mode rejects a non-boolean value', async () 
   assert.equal(res.status, 400);
 });
 
+test('GET /api/settings/pulling-disabled defaults to false, any signed-in user', async () => {
+  const res = await asSdr(request(app).get('/api/settings/pulling-disabled'));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.enabled, false);
+});
+
+test('PUT /api/settings/pulling-disabled is admin-only', async () => {
+  const res = await asSdr(request(app).put('/api/settings/pulling-disabled')).send({ enabled: true });
+  assert.equal(res.status, 403);
+});
+
+test('PUT /api/settings/pulling-disabled toggles it, visible on the GET endpoint', async () => {
+  const put = await admin(request(app).put('/api/settings/pulling-disabled')).send({ enabled: true });
+  assert.equal(put.status, 200);
+  assert.equal(put.body.enabled, true);
+
+  const get = await asSdr(request(app).get('/api/settings/pulling-disabled'));
+  assert.equal(get.body.enabled, true);
+
+  await admin(request(app).put('/api/settings/pulling-disabled')).send({ enabled: false });
+  const get2 = await asSdr(request(app).get('/api/settings/pulling-disabled'));
+  assert.equal(get2.body.enabled, false);
+});
+
+test('PUT /api/settings/pulling-disabled rejects a non-boolean value', async () => {
+  const res = await admin(request(app).put('/api/settings/pulling-disabled')).send({ enabled: 'yes' });
+  assert.equal(res.status, 400);
+});
+
 test('GET /api/settings/funnel-stats defaults to all zero, any signed-in user', async () => {
   const res = await asSdr(request(app).get('/api/settings/funnel-stats'));
   assert.equal(res.status, 200);

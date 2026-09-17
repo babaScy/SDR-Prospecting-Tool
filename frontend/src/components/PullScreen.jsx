@@ -3,6 +3,7 @@ import {
   startPull, fetchLists, fetchList,
   fetchQualificationMode, setQualificationMode as saveQualificationMode,
   fetchMaintenanceStatus, setMaintenanceMode as saveMaintenanceMode,
+  fetchPullingDisabled, setPullingDisabled as savePullingDisabled,
 } from '../api';
 import USERS from '../users';
 
@@ -21,6 +22,8 @@ export default function PullScreen() {
   const [modeError, setModeError] = useState('');
   const [maintenanceMode, setMaintenanceModeState] = useState(null);
   const [maintenanceError, setMaintenanceError] = useState('');
+  const [pullingDisabled, setPullingDisabledState] = useState(null);
+  const [pullingDisabledError, setPullingDisabledError] = useState('');
 
   // On mount, pick up a pull that's already running (e.g. after a page refresh).
   useEffect(() => {
@@ -61,6 +64,22 @@ export default function PullScreen() {
       setMaintenanceModeState(res.enabled);
     } catch (err) {
       setMaintenanceError(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchPullingDisabled()
+      .then(({ enabled }) => setPullingDisabledState(enabled))
+      .catch(() => {});
+  }, []);
+
+  const changePullingDisabled = async (enabled) => {
+    setPullingDisabledError('');
+    try {
+      const res = await savePullingDisabled(enabled);
+      setPullingDisabledState(res.enabled);
+    } catch (err) {
+      setPullingDisabledError(err.message);
     }
   };
 
@@ -127,6 +146,25 @@ export default function PullScreen() {
       </div>
 
       <div className="panel">
+        <h2>Pulling</h2>
+        <div className="form-row">
+          <label>
+            <input
+              type="checkbox"
+              checked={Boolean(pullingDisabled)}
+              disabled={pullingDisabled === null}
+              onChange={(e) => changePullingDisabled(e.target.checked)}
+            />
+            {' '}Disable starting new pulls for everyone (existing lists, review, and contacts stay reachable)
+          </label>
+        </div>
+        {pullingDisabled && (
+          <p className="muted">On — no one can start a new pull. Existing lists and contacts are unaffected. Turn this off when you're done.</p>
+        )}
+        {pullingDisabledError && <p className="error">{pullingDisabledError}</p>}
+      </div>
+
+      <div className="panel">
         <h2>Pull leads</h2>
         <form className="form-row" onSubmit={submit}>
           <label>
@@ -157,7 +195,7 @@ export default function PullScreen() {
               ))}
             </select>
           </label>
-          <button className="btn" type="submit" disabled={isRunning}>
+          <button className="btn" type="submit" disabled={isRunning || Boolean(pullingDisabled)}>
             {isRunning ? 'Pull running…' : 'Pull leads'}
           </button>
         </form>

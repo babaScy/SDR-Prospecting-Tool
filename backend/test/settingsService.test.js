@@ -6,6 +6,8 @@ const {
   setQualificationMode,
   getMaintenanceMode,
   setMaintenanceMode,
+  getPullingDisabled,
+  setPullingDisabled,
   getFunnelStats,
   setFunnelStats,
 } = require('../src/services/settingsService');
@@ -41,6 +43,23 @@ test('setMaintenanceMode persists and getMaintenanceMode reflects it', async () 
 
   await setMaintenanceMode(false);
   assert.equal(await getMaintenanceMode(), false);
+});
+
+test('getPullingDisabled defaults to false (off) when unset', async () => {
+  assert.equal(await getPullingDisabled(), false);
+});
+
+test('setPullingDisabled persists and getPullingDisabled reflects it', async () => {
+  await setPullingDisabled(true);
+  assert.equal(await getPullingDisabled(), true);
+
+  await setPullingDisabled(false);
+  assert.equal(await getPullingDisabled(), false);
+});
+
+test('setPullingDisabled rejects a non-boolean value', async () => {
+  await assert.rejects(() => setPullingDisabled('yes'));
+  assert.equal(await getPullingDisabled(), false); // unchanged
 });
 
 test('getFunnelStats defaults to all zero when unset', async () => {

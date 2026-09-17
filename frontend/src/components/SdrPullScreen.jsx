@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { startSdrPull, fetchQuota, fetchLists, fetchList } from '../api';
+import { startSdrPull, fetchQuota, fetchLists, fetchList, fetchPullingDisabled } from '../api';
 
 const RUNNING = ['pulling', 'qualifying'];
 
@@ -10,7 +10,12 @@ export default function SdrPullScreen({ regions = [] }) {
   const [profile, setProfile] = useState('icp1');
   const [activeList, setActiveList] = useState(null);
   const [quota, setQuota] = useState(null); // { qualifiedToday, quota }
+  const [pullingDisabled, setPullingDisabledState] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchPullingDisabled().then(({ enabled }) => setPullingDisabledState(enabled)).catch(() => {});
+  }, []);
 
   const refreshQuota = () => fetchQuota(region).then(setQuota).catch(() => {});
 
@@ -40,7 +45,7 @@ export default function SdrPullScreen({ regions = [] }) {
 
   const atQuota = quota && quota.qualifiedToday >= quota.quota;
   const alreadyPulledToday = Boolean(quota?.pulledToday);
-  const blocked = atQuota || alreadyPulledToday;
+  const blocked = atQuota || alreadyPulledToday || pullingDisabled;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -58,6 +63,7 @@ export default function SdrPullScreen({ regions = [] }) {
     <div>
       <div className="panel">
         <h2>Pull leads</h2>
+        {pullingDisabled && <p className="error">Pulling is temporarily disabled — check back shortly.</p>}
         {quota && (
           <p className="muted">
             <strong>{quota.qualifiedToday} / {quota.quota}</strong> qualified today

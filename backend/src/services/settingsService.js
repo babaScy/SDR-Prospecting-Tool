@@ -30,6 +30,25 @@ async function setMaintenanceMode(enabled) {
   await PipelineState.findOneAndUpdate({ key: MAINTENANCE_KEY }, { $set: { value: enabled } }, { upsert: true });
 }
 
+// Pulling toggle: blocks only new pulls (POST /api/pull, both self-serve and
+// admin) at the route level — everything else (viewing/reviewing existing
+// lists, contacts, HubSpot push) stays reachable. Narrower than maintenance
+// mode on purpose: e.g. the Anthropic account running out of credit doesn't
+// mean SDRs should be locked out of reviewing leads they already have, only
+// that starting a new pull would immediately fail at the qualify step and
+// waste Apollo credits getting there.
+const PULLING_DISABLED_KEY = 'pullingDisabled';
+
+async function getPullingDisabled() {
+  const doc = await PipelineState.findOne({ key: PULLING_DISABLED_KEY });
+  return doc?.value === true;
+}
+
+async function setPullingDisabled(enabled) {
+  if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+  await PipelineState.findOneAndUpdate({ key: PULLING_DISABLED_KEY }, { $set: { value: enabled } }, { upsert: true });
+}
+
 // Funnel stats shown on ListsScreen (demos booked, SQLs, closed-won deals,
 // closed-won revenue). Admin-entered — Prospector has no downstream HubSpot
 // deal-pipeline data of its own to compute these from. Same PipelineState-
@@ -61,6 +80,8 @@ module.exports = {
   MODES,
   getMaintenanceMode,
   setMaintenanceMode,
+  getPullingDisabled,
+  setPullingDisabled,
   getFunnelStats,
   setFunnelStats,
 };

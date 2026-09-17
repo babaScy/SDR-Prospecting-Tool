@@ -57,6 +57,10 @@ export const fetchMaintenanceStatus = () => request('/api/maintenance-status');
 export const setMaintenanceMode = (enabled) =>
   request('/api/settings/maintenance-mode', { method: 'PUT', body: JSON.stringify({ enabled }) });
 
+export const fetchPullingDisabled = () => request('/api/settings/pulling-disabled');
+export const setPullingDisabled = (enabled) =>
+  request('/api/settings/pulling-disabled', { method: 'PUT', body: JSON.stringify({ enabled }) });
+
 export const fetchFunnelStats = () => request('/api/settings/funnel-stats');
 export const setFunnelStats = (stats) =>
   request('/api/settings/funnel-stats', { method: 'PUT', body: JSON.stringify(stats) });
