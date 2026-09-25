@@ -78,6 +78,17 @@ Once you have enough information, call submit_result with your findings.
 `.trim();
 }
 
+// Visibility into the exact thing that regressed on the 4.6->5 switch — logs
+// go to the server console, not the SDR-facing progressLog (onLog), since
+// this is an engineering/cost signal, not pull progress.
+function logUsage(companyName, usage) {
+  if (!usage) return;
+  console.log(
+    `[qualifier] usage for ${companyName}: input=${usage.input_tokens} output=${usage.output_tokens} ` +
+      `cache_write=${usage.cache_creation_input_tokens ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0}`
+  );
+}
+
 async function persistResult(company, result) {
   let newStatus;
   if (result.icp === 'Yes') newStatus = 'qualified';
@@ -101,6 +112,15 @@ const qualifyCompaniesBatch = async (companies, onLog = () => {}) => {
     params: {
       model: 'claude-sonnet-5',
       max_tokens: 2048,
+      // Sonnet 5 runs adaptive thinking by default even with no `thinking`
+      // param set (unlike Sonnet 4.6, which needed it set explicitly) — that
+      // silently tripled output tokens and 9x'd cache-read tokens per
+      // qualification after the 4.6->5 switch (2026-09-15/16 billing
+      // comparison). 'medium' caps thinking depth instead of disabling it
+      // outright — disabling risks the model writing a tool call into plain
+      // text instead of a real tool_use block, which would break
+      // submitCall detection below with no error.
+      output_config: { effort: 'medium' },
       system: systemBlocks,
       tools,
       messages: [{ role: 'user', content: buildUserMessage(company) }],
@@ -138,6 +158,7 @@ const qualifyCompaniesBatch = async (companies, onLog = () => {}) => {
     if (!company) continue;
 
     if (item.result.type === 'succeeded') {
+      logUsage(company.companyName, item.result.message.usage);
       const submitCall = item.result.message.content.find(
         (b) => b.type === 'tool_use' && b.name === 'submit_result'
       );
@@ -165,10 +186,14 @@ async function qualifyOneSync(company) {
   const msg = await anthropic.messages.create({
     model: 'claude-sonnet-5',
     max_tokens: 2048,
+    // See the matching comment in qualifyCompaniesBatch's request params —
+    // same effort cap, same reason.
+    output_config: { effort: 'medium' },
     system: systemBlocks,
     tools,
     messages: [{ role: 'user', content: buildUserMessage(company) }],
   });
+  logUsage(company.companyName, msg.usage);
   const submitCall = msg.content.find((b) => b.type === 'tool_use' && b.name === 'submit_result');
   if (!submitCall) return { ok: false, error: 'no submit_result call' };
   await persistResult(company, submitCall.input);
@@ -201,4 +226,7 @@ const qualifyCompanies = async (companies, onLog = () => {}, deps = {}) => {
   return mode === 'single' ? sync(companies, onLog) : batch(companies, onLog);
 };
 
-module.exports = { qualifyCompaniesBatch, qualifyCompaniesSync, qualifyCompanies, persistResult };
+module.exports = {
+  qualifyCompaniesBatch, qualifyCompaniesSync, qualifyCompanies, persistResult,
+  buildUserMessage, tools, systemBlocks, getClient,
+};

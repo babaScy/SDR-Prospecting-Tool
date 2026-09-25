@@ -13,13 +13,14 @@
  * instead walks HubSpot's own company→contact associations directly, so it
  * finds those "invisible" contacts too.
  *
- * A contact is "already fine" (no action needed) if either:
- *   - hs_object_source_detail_1 === 'AI-SDR-App' (Prospector's own push
- *     created it), or
- *   - wolf_prospect === 'true' already.
- * Otherwise it's classified the same way hubspotGapReport.js classifies a
- * company: predatesWolf(contact's HubSpot createdate, the company's
- * Prospector pull time) decides genuine gap vs. pre-existing vs. unknown.
+ * Policy (explicit, per product decision — a contact does NOT get its own
+ * predates-WOLF check): once a company is confirmed WOLF (that's what being
+ * in company-gaps.csv already means — see hubspotGapReport.js), every
+ * contact on it is WOLF too, regardless of that contact's own HubSpot
+ * history. A contact is only left alone if it's already fine on its own
+ * terms — hs_object_source_detail_1 === 'AI-SDR-App' (Prospector's own push
+ * created it) or wolf_prospect === 'true' already — otherwise it's a gap,
+ * full stop, no date comparison.
  *
  * Usage:
  *   node scripts/checkCompanyContactCoverage.js <company-gaps.csv> [--csv <outDir>]
@@ -33,8 +34,8 @@ const path = require('path');
 const mongoose = require('mongoose');
 const Company = require('../src/models/Company');
 const hubspotService = require('../src/services/hubspotService');
-const { parseCsv } = require('./tagWolfProspects');
-const { classifySourceDetail, predatesWolf } = require('./hubspotGapReport');
+const { parseCsv } = require('./csvParse');
+const { classifySourceDetail } = require('./hubspotGapReport');
 
 function normalizeDomain(url) {
   if (!url) return null;
@@ -51,19 +52,13 @@ function writeCsv(filePath, rows, columns) {
   fs.writeFileSync(filePath, `${lines.join('\n')}\n`);
 }
 
-async function main() {
-  const csvFlagIndex = process.argv.indexOf('--csv');
-  const csvOutDir = csvFlagIndex !== -1 ? process.argv[csvFlagIndex + 1] : null;
-  const companyGapsPath = process.argv.find((a, i) => i >= 2 && !a.startsWith('--') && a !== csvOutDir);
-  if (!companyGapsPath) {
-    console.error('Usage: node scripts/checkCompanyContactCoverage.js <company-gaps.csv> [--csv <outDir>]');
-    process.exitCode = 1;
-    return;
-  }
-
-  await mongoose.connect(process.env.MONGODB_URI, { dbName: 'PROSPECTOR' });
-
-  const companies = parseCsv(companyGapsPath);
+// Core check, reusable by other scripts (e.g. tagWolfProspects.js chains
+// this in automatically so tagging a run's gaps also catches contacts that
+// are invisible to Mongo). Requires an open mongoose connection — callers own
+// connect/disconnect since they may be doing other Mongo work in the same
+// process. companyRows is the parsed contents of a company-gaps.csv (or
+// anything with the same Company/Domain/HubSpot Company ID columns).
+async function findCoverageGaps(companyRows) {
   const byDomain = new Map();
   for (const c of await Company.find({ sdrStatus: 'accepted' }).select('website createdAt companyName').lean()) {
     const d = normalizeDomain(c.website);
@@ -72,13 +67,11 @@ async function main() {
 
   const alreadyFine = [];
   const newGaps = [];
-  const preExisting = [];
-  const dateUnknown = [];
   const errors = [];
   let noAssociations = 0;
   let noProspectorMatch = 0;
 
-  for (const row of companies) {
+  for (const row of companyRows) {
     const hubspotCompanyId = row['HubSpot Company ID'];
     const domain = normalizeDomain(row.Domain);
     const prospectorCompany = byDomain.get(domain);
@@ -101,20 +94,32 @@ async function main() {
         const p = rec.data.properties;
         const label = `${row.Company} — ${p.firstname || ''} ${p.lastname || ''}`.trim();
         const sourceClass = classifySourceDetail(p.hs_object_source_detail_1);
-        if (sourceClass.bucket === 'known' || p.wolf_prospect === 'true') {
-          alreadyFine.push({ contact: label, email: p.email || '', company: row.Company, hubspotContactId: contactId });
-          continue;
-        }
-        const predates = predatesWolf(rec.data.createdAt, prospectorCompany.createdAt);
         const entry = { contact: label, email: p.email || '', company: row.Company, hubspotContactId: contactId };
-        if (predates === true) preExisting.push(entry);
-        else if (predates === false) newGaps.push(entry);
-        else dateUnknown.push(entry);
+        if (sourceClass.bucket === 'known' || p.wolf_prospect === 'true') alreadyFine.push(entry);
+        else newGaps.push(entry); // belongs to a WOLF company → WOLF too, no date check
       }
     } catch (err) {
       errors.push({ company: row.Company, hubspotCompanyId, error: err.message });
     }
   }
+
+  return { alreadyFine, newGaps, errors, noAssociations, noProspectorMatch };
+}
+
+async function main() {
+  const csvFlagIndex = process.argv.indexOf('--csv');
+  const csvOutDir = csvFlagIndex !== -1 ? process.argv[csvFlagIndex + 1] : null;
+  const companyGapsPath = process.argv.find((a, i) => i >= 2 && !a.startsWith('--') && a !== csvOutDir);
+  if (!companyGapsPath) {
+    console.error('Usage: node scripts/checkCompanyContactCoverage.js <company-gaps.csv> [--csv <outDir>]');
+    process.exitCode = 1;
+    return;
+  }
+
+  await mongoose.connect(process.env.MONGODB_URI, { dbName: 'PROSPECTOR' });
+
+  const companies = parseCsv(companyGapsPath);
+  const { alreadyFine, newGaps, errors, noAssociations, noProspectorMatch } = await findCoverageGaps(companies);
 
   console.log(`\n=== Contact coverage check — ${companies.length} WOLF companies ===`);
   console.log(`${noProspectorMatch} skipped — no matching Prospector company by domain, ${noAssociations} have no associated HubSpot contacts at all\n`);
@@ -124,14 +129,6 @@ async function main() {
 
   console.log(`\n(${alreadyFine.length} already fine — created by Prospector's push or already tagged)`);
 
-  if (preExisting.length) {
-    console.log(`\n=== PRE-EXISTING (predates WOLF — NOT tag-eligible): ${preExisting.length} ===`);
-    preExisting.forEach((g) => console.log(`  ${g.contact} <${g.email}> [${g.hubspotContactId}]`));
-  }
-  if (dateUnknown.length) {
-    console.log(`\n=== DATE UNKNOWN (needs manual review): ${dateUnknown.length} ===`);
-    dateUnknown.forEach((g) => console.log(`  ${g.contact} <${g.email}> [${g.hubspotContactId}]`));
-  }
   if (errors.length) {
     console.log(`\n=== ERRORS: ${errors.length} ===`);
     errors.forEach((e) => console.log(`  ${e.company} [${e.hubspotCompanyId}]: ${e.error}`));
@@ -146,12 +143,13 @@ async function main() {
       { key: 'hubspotContactId', header: 'HubSpot Contact ID' },
     ];
     writeCsv(path.join(csvOutDir, 'contact-coverage-gaps.csv'), newGaps, columns);
-    writeCsv(path.join(csvOutDir, 'contact-coverage-pre-existing.csv'), preExisting, columns);
-    console.log(`\nCSVs written to ${csvOutDir}: contact-coverage-gaps.csv (${newGaps.length}), contact-coverage-pre-existing.csv (${preExisting.length})`);
+    console.log(`\nCSVs written to ${csvOutDir}: contact-coverage-gaps.csv (${newGaps.length})`);
   }
 
   await mongoose.disconnect();
 }
+
+module.exports = { findCoverageGaps, normalizeDomain };
 
 if (require.main === module) {
   main().catch((err) => { console.error(err); process.exitCode = 1; });

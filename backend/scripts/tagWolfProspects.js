@@ -8,15 +8,30 @@
  * changed after the fact (see hubspotGapReport.js for how the gap lists were
  * built).
  *
- * If company-pre-existing.csv is also present in the directory (companies
- * hubspotGapReport.js found predate WOLF sourcing them — see predatesWolf),
- * this also sets wolf_prospect=false on those, correcting any that were
- * previously mis-tagged by an older run that didn't check dates.
+ * The predates-WOLF check (see hubspotGapReport.js's classifyGapByDate) is a
+ * COMPANY-level decision only. If company-pre-existing.csv is present
+ * (companies that predate WOLF sourcing them), this sets wolf_prospect=false
+ * on those, correcting any that were previously mis-tagged. If
+ * contact-pre-existing.csv is present (contacts on those pre-existing
+ * companies), same correction. Once a company IS confirmed WOLF, though,
+ * every contact on it is WOLF too — no individual date check — see
+ * contact-gaps.csv's policy note in hubspotGapReport.js for why.
+ *
+ * Also chains in checkCompanyContactCoverage.js's check (unless
+ * --contacts-only) against the same company-gaps.csv: a contact who belongs
+ * to a WOLF company but was never sourced through Prospector's own Contact
+ * collection (contact sourcing never ran, or HubSpot's own automation added
+ * one later) is invisible to hubspotGapReport.js's contact-level check,
+ * which only ever looks at contacts Prospector's Mongo already knows about.
+ * Same policy: it belongs to a WOLF company, so it's tagged true — no date
+ * check on the contact itself.
  *
  * WRITES to HubSpot: creates one property definition per object type (only
  * if missing) and batch-updates wolf_prospect on each record in the CSVs
- * (true for gaps, false for pre-existing). Touches no other property, and
- * creates/deletes/associates nothing.
+ * (true for gaps, false for pre-existing), plus whatever
+ * checkCompanyContactCoverage.js's findCoverageGaps() turns up on those same
+ * companies. Touches no other property, and creates/deletes/associates
+ * nothing.
  *
  * Usage: node scripts/tagWolfProspects.js <gapReportDir>
  *   <gapReportDir> must contain company-gaps.csv and contact-gaps.csv, as
@@ -26,39 +41,15 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 const hubspotService = require('../src/services/hubspotService');
+const { findCoverageGaps } = require('./checkCompanyContactCoverage');
+const { parseCsv } = require('./csvParse');
 
 const PROPERTY_NAME = 'wolf_prospect';
 const PROPERTY_LABEL = 'WOLF Prospect';
 const GROUP_NAME = { companies: 'companyinformation', contacts: 'contactinformation' };
 const ID_COLUMN = { companies: 'HubSpot Company ID', contacts: 'HubSpot Contact ID' };
-
-// Minimal CSV parser — only needs to round-trip what writeCsv() in
-// hubspotGapReport.js produces (comma-separated, "-quoted when a field has a
-// comma/quote/newline, "" for an escaped quote).
-function parseCsv(filePath) {
-  const text = fs.readFileSync(filePath, 'utf8').trim();
-  const parseLine = (line) => {
-    const cells = [];
-    let cur = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (inQuotes) {
-        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-        else if (c === '"') inQuotes = false;
-        else cur += c;
-      } else if (c === '"') inQuotes = true;
-      else if (c === ',') { cells.push(cur); cur = ''; }
-      else cur += c;
-    }
-    cells.push(cur);
-    return cells;
-  };
-  const [headerLine, ...lines] = text.split('\n');
-  const headers = parseLine(headerLine);
-  return lines.map((line) => Object.fromEntries(headers.map((h, i) => [h, parseLine(line)[i]])));
-}
 
 async function ensureProperty(objectType) {
   const existing = await hubspotService.hsRequest('get', `/crm/v3/properties/${objectType}`);
@@ -123,6 +114,34 @@ async function main() {
       console.log(`\nCorrecting ${preExisting.length} companies that predate WOLF sourcing them (unsetting "${PROPERTY_LABEL}")...`);
       await batchSetProperty('companies', preExisting.map((c) => c[ID_COLUMN.companies]), 'false');
     }
+  }
+
+  // Same correction for contacts on those pre-existing companies — a contact
+  // whose own HubSpot createdate predates the company's Prospector pull is
+  // just as much "not WOLF's" as the company itself (see classifyGapByDate).
+  const contactPreExistingPath = path.join(dir, 'contact-pre-existing.csv');
+  if (fs.existsSync(contactPreExistingPath)) {
+    const contactPreExisting = parseCsv(contactPreExistingPath);
+    if (contactPreExisting.length) {
+      console.log(`\nCorrecting ${contactPreExisting.length} contacts that predate WOLF sourcing their company (unsetting "${PROPERTY_LABEL}")...`);
+      await batchSetProperty('contacts', contactPreExisting.map((c) => c[ID_COLUMN.contacts]), 'false');
+    }
+  }
+
+  // Any contact belonging to one of these WOLF companies gets tagged too,
+  // whether or not Prospector's own Contact collection knows about it — see
+  // checkCompanyContactCoverage.js. Needs its own Mongo connection (domain
+  // matching against Company docs); tagWolfProspects.js otherwise has none.
+  console.log(`\nChecking contact coverage on these ${companies.length} companies for contacts invisible to Prospector's own Mongo...`);
+  await mongoose.connect(process.env.MONGODB_URI, { dbName: 'PROSPECTOR' });
+  const coverage = await findCoverageGaps(companies);
+  await mongoose.disconnect();
+  console.log(
+    `Coverage check: ${coverage.newGaps.length} new contact gaps (tag-eligible — belongs to a WOLF company), ` +
+      `${coverage.errors.length} errors (skipped)`
+  );
+  if (coverage.newGaps.length) {
+    await batchSetProperty('contacts', coverage.newGaps.map((g) => g.hubspotContactId), 'true');
   }
 
   console.log('\nDone.');

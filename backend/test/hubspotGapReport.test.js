@@ -9,6 +9,9 @@ const {
   isNotFoundError,
   classifyLookupResult,
   predatesWolf,
+  classifyGapByDate,
+  companyScopeQuery,
+  contactsOnAlreadyCheckedCompanies,
 } = require('../scripts/hubspotGapReport');
 
 // ─── classifyContactRecord ───────────────────────────────────────────────
@@ -136,4 +139,60 @@ test('predatesWolf: unparseable/missing dates → unknown (null), not guessed', 
   assert.equal(predatesWolf(undefined, '2026-08-12T11:40:27.647Z'), null);
   assert.equal(predatesWolf('2026-08-12T11:45:36.333Z', undefined), null);
   assert.equal(predatesWolf('not-a-date', '2026-08-12T11:40:27.647Z'), null);
+});
+
+// ─── classifyGapByDate ────────────────────────────────────────────────────
+// Shared by company-level and contact-level gap filing — a contact is
+// checked against its COMPANY's pull time, not its own sourcing time (see
+// fileContactGap), which is why the bug this was written to fix (a contact
+// on a pre-existing company still getting tagged as a WOLF gap) existed:
+// the direct Mongo-Contact check path never ran this comparison at all.
+test('classifyGapByDate: HubSpot record created before Prospector\'s pull → preExisting, not a gap', () => {
+  assert.equal(classifyGapByDate('2023-09-14T09:05:44.562Z', '2026-09-09T12:26:59.075Z'), 'preExisting');
+});
+
+test('classifyGapByDate: HubSpot record created after Prospector\'s pull → gap', () => {
+  assert.equal(classifyGapByDate('2026-09-16T14:59:29.585Z', '2026-09-09T12:26:59.075Z'), 'gap');
+});
+
+test('classifyGapByDate: unparseable/missing dates → dateUnknown, not guessed', () => {
+  assert.equal(classifyGapByDate(undefined, '2026-08-12T11:40:27.647Z'), 'dateUnknown');
+  assert.equal(classifyGapByDate('2026-08-12T11:45:36.333Z', undefined), 'dateUnknown');
+});
+
+// ─── companyScopeQuery ────────────────────────────────────────────────────
+// Incremental runs (weekly): only re-check companies newly accepted since
+// the last run, keyed on sdrReviewedAt (not createdAt) — a company can sit
+// pulled-but-unreviewed for a while before an SDR gets to it.
+test('companyScopeQuery: no checkpoint (first run, or --full) checks every accepted company', () => {
+  assert.deepEqual(companyScopeQuery(null), { sdrStatus: 'accepted' });
+});
+
+test('companyScopeQuery: a checkpoint scopes to companies accepted since then', () => {
+  const since = new Date('2026-09-01T00:00:00.000Z');
+  assert.deepEqual(companyScopeQuery(since), { sdrStatus: 'accepted', sdrReviewedAt: { $gte: since } });
+});
+
+// ─── contactsOnAlreadyCheckedCompanies ───────────────────────────────────
+// Contacts sourced after a company was already checked in an earlier run
+// still need their own check even though the company doesn't.
+test('contactsOnAlreadyCheckedCompanies: keeps only contacts whose company is NOT in this run\'s scope', () => {
+  const contacts = [
+    { _id: 'c1', companyId: 'newCo' },
+    { _id: 'c2', companyId: 'oldCo' },
+  ];
+  assert.deepEqual(
+    contactsOnAlreadyCheckedCompanies(contacts, ['newCo']),
+    [{ _id: 'c2', companyId: 'oldCo' }]
+  );
+});
+
+test('contactsOnAlreadyCheckedCompanies: compares ids as strings (ObjectId vs string mismatch)', () => {
+  const contacts = [{ _id: 'c1', companyId: { toString: () => 'newCo' } }];
+  assert.deepEqual(contactsOnAlreadyCheckedCompanies(contacts, [{ toString: () => 'newCo' }]), []);
+});
+
+test('contactsOnAlreadyCheckedCompanies: empty scope means every contact is on an already-checked company', () => {
+  const contacts = [{ _id: 'c1', companyId: 'oldCo' }];
+  assert.deepEqual(contactsOnAlreadyCheckedCompanies(contacts, []), contacts);
 });
